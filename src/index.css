@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Colors (Optional) */
+.bg-cream { background-color: #F9F7F2; }
+.bg-charcoal { background-color: #2D2D2D; }
+.text-gold { color: #D4AF37; }
+.bg-gold { background-color: #D4AF37; }

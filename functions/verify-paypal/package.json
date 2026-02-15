@@ -1,0 +1,13 @@
+{
+  "name": "verify-paypal",
+  "version": "1.0.0",
+  "description": "PayPal Verification Function",
+  "main": "src/main.js",
+  "dependencies": {
+    "@paypal/checkout-server-sdk": "^1.0.3",
+    "node-appwrite": "^12.0.1"
+  },
+  "devDependencies": {
+    "prettier": "^3.2.5"
+  }
+}
