@@ -128,12 +128,19 @@ const ProductDetails = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* LEFT SIDE */}
           <div className="space-y-6">
-            <div className="bg-white p-4 shadow-sm border aspect-[4/3] flex items-center justify-center bg-gray-50 overflow-hidden">
+            <div className="w-full h-full flex items-center justify-center">
               <img
                 src={selectedImage}
                 alt={product.title}
-                className={`${isLandscape ? 'w-full h-auto' : 'h-full w-auto'} shadow-md`}
-              />
+                className={`
+                   ${isLandscape ? 'w-full h-auto max-h-full' : 'h-full w-auto max-w-full'} 
+                   object-contain 
+                   shadow-lg 
+                   transition-all 
+                   duration-500 
+                   ease-in-out
+                  `}
+               />
             </div>
 
             {allImages.length > 1 && (
@@ -142,9 +149,8 @@ const ProductDetails = () => {
                   <button
                     key={index}
                     onClick={() => setSelectedImage(img)}
-                    className={`border-2 p-1 w-20 h-20 flex-shrink-0 ${
-                      selectedImage === img ? 'border-black' : 'border-transparent'
-                    }`}
+                    className={`border-2 p-1 w-20 h-20 flex-shrink-0 ${selectedImage === img ? 'border-black' : 'border-transparent'
+                      }`}
                   >
                     <img src={img} className="w-full h-full object-cover" alt="thumbnail" />
                   </button>
@@ -211,7 +217,7 @@ const ProductDetails = () => {
                 >
                   Description
                 </button>
-                <button 
+                <button
                   onClick={() => setActiveTab('shipping')}
                   className={`pb-2 text-sm font-bold uppercase tracking-wider ${activeTab === 'shipping' ? 'border-b-2 border-black' : 'text-gray-400'}`}
                 >
