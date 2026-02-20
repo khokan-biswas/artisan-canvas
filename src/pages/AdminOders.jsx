@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import service from '../backend/config'; // Import your backend service
+import service from '../backend/config';
 import { 
   LayoutDashboard, 
   Package, 
@@ -12,19 +12,14 @@ import {
   ChevronDown,
   Download,
   Loader2,
-  Save,
-  CheckCircle2
+  MapPin // Added for Address icon
 } from 'lucide-react';
-
-// --- Components ---
 
 const SidebarItem = ({ icon: Icon, label, to = "#", active }) => (
   <Link 
     to={to} 
     className={`flex items-center space-x-3 px-4 py-3 rounded-md transition-all duration-200 group ${
-      active 
-        ? 'bg-[#EAE5D8] text-charcoal font-medium' 
-        : 'text-gray-500 hover:bg-[#F5F2EB] hover:text-charcoal'
+      active ? 'bg-[#EAE5D8] text-charcoal font-medium' : 'text-gray-500 hover:bg-[#F5F2EB] hover:text-charcoal'
     }`}
   >
     <Icon size={20} className={active ? 'text-charcoal' : 'text-gray-400 group-hover:text-charcoal'} />
@@ -37,9 +32,8 @@ const AdminOrders = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [updatingId, setUpdatingId] = useState(null); // Track which row is updating
+  const [updatingId, setUpdatingId] = useState(null);
 
-  // 1. Fetch Orders
   useEffect(() => {
     const fetchOrders = async () => {
       try {
@@ -54,25 +48,19 @@ const AdminOrders = () => {
     fetchOrders();
   }, []);
 
-  // 2. Handle Updates (Live Database Edit)
   const handleUpdate = async (orderId, field, value) => {
-      setUpdatingId(orderId); // Show spinner for this row
+      setUpdatingId(orderId);
       try {
-          // Update in Database
           await service.updateOrder(orderId, { [field]: value });
-          
-          // Update in Local State (UI)
           setOrders(prev => prev.map(o => o.$id === orderId ? { ...o, [field]: value } : o));
-          
       } catch (error) {
           console.error("Update failed:", error);
-          alert("Failed to update order. Check console.");
+          alert("Failed to update order.");
       } finally {
           setUpdatingId(null);
       }
   };
 
-  // 3. Filter Logic
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
         (order.customerName && order.customerName.toLowerCase().includes(searchTerm.toLowerCase())) || 
@@ -88,7 +76,6 @@ const AdminOrders = () => {
     });
   };
 
-  // Helper for Status Colors
   const getStatusColor = (status) => {
       const s = status?.toLowerCase() || '';
       if (s === 'paid' || s === 'completed') return 'bg-green-100 text-green-800 border-green-200';
@@ -97,21 +84,15 @@ const AdminOrders = () => {
       return 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
-  // Helper for Order Complete Colors
   const getCompleteColor = (val) => {
-      return val === 'yes' 
-        ? 'bg-blue-100 text-blue-800 border-blue-200' 
-        : 'bg-gray-100 text-gray-500 border-gray-200';
+      return val === 'yes' ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-gray-100 text-gray-500 border-gray-200';
   };
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] flex font-sans text-charcoal">
       
-      {/* SIDEBAR */}
       <aside className="w-64 bg-[#F9F7F2] border-r border-[#EBE7DE] fixed h-full hidden md:flex flex-col z-20">
-        <div className="p-8">
-            <h1 className="text-2xl font-serif text-charcoal">Artisan Canvas</h1>
-        </div>
+        <div className="p-8"><h1 className="text-2xl font-serif text-charcoal">Artisan Canvas</h1></div>
         <nav className="flex-1 px-4 space-y-2">
             <SidebarItem icon={LayoutDashboard} label="Dashboard" to="/admin/dashboard" />
             <SidebarItem icon={Package} label="Products" to="/admin/products" />
@@ -122,71 +103,56 @@ const AdminOrders = () => {
         </nav>
       </aside>
 
-      {/* MAIN CONTENT */}
       <main className="flex-1 md:ml-64 p-8">
-        
-        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-            <h2 className="text-3xl font-serif text-charcoal">Orders</h2>
-            <div className="flex gap-2">
-                 <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-50 transition">
-                    <Download size={16} /> Export CSV
-                 </button>
-            </div>
+            <h2 className="text-3xl font-serif text-charcoal">Orders Management</h2>
+            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-50 transition">
+                <Download size={16} /> Export CSV
+            </button>
         </div>
 
-        {/* Filters */}
         <div className="bg-white p-4 rounded-t-xl border border-gray-200 border-b-0 flex flex-col md:flex-row gap-4 justify-between items-center">
-            <div className="flex gap-3 w-full md:w-auto overflow-x-auto">
-                <div className="relative group">
-                    <select 
-                        className="appearance-none pl-3 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-charcoal outline-none focus:ring-1 focus:ring-charcoal cursor-pointer min-w-[140px]"
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        value={filterStatus}
-                    >
-                        <option value="">All Statuses</option>
-                        <option value="Paid">Paid</option>
-                        <option value="COD">COD</option>
-                        <option value="Failed">Failed</option>
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                </div>
+            <div className="relative group">
+                <select 
+                    className="appearance-none pl-3 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-charcoal outline-none focus:ring-1 focus:ring-charcoal cursor-pointer min-w-[140px]"
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    value={filterStatus}
+                >
+                    <option value="">All Statuses</option>
+                    <option value="Paid">Paid</option>
+                    <option value="COD">COD</option>
+                    <option value="Failed">Failed</option>
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
             </div>
             <div className="relative w-full md:w-64">
                 <Search className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
                 <input 
                     type="text" 
-                    placeholder="Search ID or Customer..." 
+                    placeholder="Search orders..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-md text-sm focus:ring-1 focus:ring-charcoal outline-none transition-all"
+                    className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-md text-sm focus:ring-1 focus:ring-charcoal outline-none"
                 />
             </div>
         </div>
 
-        {/* DATA TABLE */}
         <div className="bg-white rounded-b-xl border border-gray-200 shadow-sm overflow-hidden min-h-[400px]">
             {loading ? (
-                <div className="flex h-64 items-center justify-center">
-                    <Loader2 className="animate-spin h-8 w-8 text-charcoal" />
-                </div>
-            ) : filteredOrders.length === 0 ? (
-                <div className="flex flex-col h-64 items-center justify-center text-gray-400">
-                    <ShoppingCart className="h-12 w-12 mb-2 opacity-20" />
-                    <p>No orders found.</p>
-                </div>
+                <div className="flex h-64 items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-charcoal" /></div>
             ) : (
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
+                    <table className="w-full text-left text-sm table-fixed">
                         <thead className="bg-gray-50 text-charcoal border-b border-gray-200">
                             <tr>
-                                <th className="px-6 py-4 font-semibold w-24">ID</th>
+                                <th className="px-6 py-4 font-semibold w-28">ID</th>
                                 <th className="px-6 py-4 font-semibold w-32">Date</th>
-                                <th className="px-6 py-4 font-semibold">Customer</th>
-                                <th className="px-6 py-4 font-semibold w-32">Payment Status</th>
-                                <th className="px-6 py-4 font-semibold w-32">Order Complete</th>
-                                <th className="px-6 py-4 font-semibold">Method</th>
-                                <th className="px-6 py-4 font-semibold text-right">Total</th>
+                                <th className="px-6 py-4 font-semibold w-48">Customer</th>
+                                <th className="px-6 py-4 font-semibold w-64">Shipping Address</th> {/* ✅ NEW COLUMN */}
+                                <th className="px-6 py-4 font-semibold w-40 text-center">Payment Status</th>
+                                <th className="px-6 py-4 font-semibold w-36 text-center">Order Complete</th>
+                                <th className="px-6 py-4 font-semibold w-32">Method</th>
+                                <th className="px-6 py-4 font-semibold w-28 text-right">Total</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -197,44 +163,51 @@ const AdminOrders = () => {
 
                                 return (
                                 <tr key={order.$id} className="hover:bg-gray-50 transition-colors group">
-                                    <td className="px-6 py-4 font-medium text-charcoal truncate max-w-[200px]" title={order.$id}>
-                                        #{order.$id.substring(0, 10)}
+                                    <td className="px-6 py-4 font-medium text-charcoal truncate" title={order.$id}>
+                                        #{order.$id.substring(0, 8)}
                                     </td>
-                                    <td className="px-6 py-4 text-gray-500">
+                                    <td className="px-6 py-4 text-gray-500 whitespace-nowrap">
                                         {formatDate(order.$createdAt)}
                                     </td>
                                     <td className="px-6 py-4 text-charcoal font-medium">
-                                        {order.customerName || "Guest"}
-                                        <div className="text-xs text-gray-400 font-normal">{order.email}</div>
+                                        <div className="truncate">{order.customerName || "Guest"}</div>
+                                        <div className="text-[11px] text-gray-400 font-normal truncate">{order.email}</div>
+                                    </td>
+
+                                    {/* ✅ NEW: Shipping Address Cell */}
+                                    <td className="px-6 py-4 text-gray-500 group-hover:text-charcoal transition-colors">
+                                        <div className="flex items-start gap-2">
+                                            <MapPin size={14} className="mt-0.5 flex-shrink-0 text-gray-300" />
+                                            <p className="text-xs leading-relaxed line-clamp-2" title={order.shippingAddress}>
+                                                {order.shippingAddress || "No address provided"}
+                                            </p>
+                                        </div>
                                     </td>
                                     
-                                    {/* 🟢 EDITABLE: Payment Status */}
-                                    <td className="px-6 py-4">
+                                    <td className="px-6 py-4 text-center">
                                         {isUpdating ? (
-                                            <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                                            <Loader2 className="h-4 w-4 animate-spin text-gray-400 mx-auto" />
                                         ) : (
                                             <select 
                                                 value={order.status || 'Pending'}
                                                 onChange={(e) => handleUpdate(order.$id, 'status', e.target.value)}
-                                                className={`appearance-none cursor-pointer pl-3 pr-8 py-1 rounded-full text-xs font-bold border outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-200 transition-all ${getStatusColor(order.status)}`}
+                                                className={`appearance-none cursor-pointer px-3 py-1 rounded-full text-[11px] font-bold border outline-none transition-all ${getStatusColor(order.status)}`}
                                             >
                                                 <option value="Paid">Paid</option>
                                                 <option value="COD">COD</option>
-                                                {/* <option value="Pending">Pending</option> */}
-                                                {/* <option value="Failed">Failed</option> */}
+                                                <option value="Failed">Failed</option>
                                             </select>
                                         )}
                                     </td>
 
-                                    {/* 🔵 EDITABLE: Order Complete */}
-                                    <td className="px-6 py-4">
+                                    <td className="px-6 py-4 text-center">
                                         {isUpdating ? (
-                                            <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                                            <Loader2 className="h-4 w-4 animate-spin text-gray-400 mx-auto" />
                                         ) : (
                                             <select 
-                                                value={order.ordercomplete || 'no'} // Default to 'no' if attribute missing
+                                                value={order.ordercomplete || 'no'}
                                                 onChange={(e) => handleUpdate(order.$id, 'ordercomplete', e.target.value)}
-                                                className={`appearance-none cursor-pointer pl-3 pr-8 py-1 rounded-full text-xs font-bold border outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-200 transition-all ${getCompleteColor(order.ordercomplete || 'no')}`}
+                                                className={`appearance-none cursor-pointer px-3 py-1 rounded-full text-[11px] font-bold border outline-none transition-all ${getCompleteColor(order.ordercomplete || 'no')}`}
                                             >
                                                 <option value="yes">Yes</option>
                                                 <option value="no">No</option>
@@ -242,11 +215,11 @@ const AdminOrders = () => {
                                         )}
                                     </td>
 
-                                    <td className="px-6 py-4 text-gray-500 capitalize">
-                                        {order.paymentId && order.paymentId.length > 20 ? "PayPal" : "COD / Manual"}
+                                    <td className="px-6 py-4 text-gray-500 text-xs font-medium uppercase tracking-tight">
+                                        {order.paymentId && order.paymentId.includes("COD") ? "COD" : "PayPal"}
                                     </td>
-                                    <td className="px-6 py-4 text-right font-medium text-charcoal font-serif">
-                                        {currency}{orderTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    <td className="px-6 py-4 text-right font-medium text-charcoal">
+                                        {currency}{orderTotal.toLocaleString()}
                                     </td>
                                 </tr>
                                 );
@@ -256,7 +229,6 @@ const AdminOrders = () => {
                 </div>
             )}
         </div>
-
       </main>
     </div>
   );

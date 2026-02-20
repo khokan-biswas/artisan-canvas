@@ -5,26 +5,33 @@ import './App.css'
 
 // Services & Store
 import authService from './backend/auth'
+import service from './backend/config'
 import { login, logout } from './store/authSlice'
+import { setCart } from './store/cartSlice'
 
 // Components
 import Header from './components/Header'
 import Footer from './components/Footer'
-import { Loader2 } from 'lucide-react' // Optional: If you have lucide-react installed
+import { Loader2 } from 'lucide-react'
 
 function App() {
   const [loading, setLoading] = useState(true)
   const dispatch = useDispatch()
 
-  // 🔄 RESTORE SESSION (Check if user is already logged in)
   useEffect(() => {
     authService.getCurrentUser()
       .then((userData) => {
         if (userData) {
-          // User is logged in
-          dispatch(login(userData))
+          dispatch(login(userData));
+
+          // 🔄 RESTORE CART: Fetch from DB whenever user session is restored on refresh
+          service.getCart(userData.$id).then((dbCart) => {
+              if (dbCart && dbCart.length > 0) {
+                  dispatch(setCart(dbCart));
+              }
+          });
+          
         } else {
-          // User is not logged in
           dispatch(logout())
         }
       })
@@ -35,7 +42,6 @@ function App() {
       .finally(() => setLoading(false))
   }, [dispatch])
 
-  // Show a full-screen loader while checking auth
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-cream">
@@ -46,15 +52,10 @@ function App() {
 
   return (
     <div className="flex flex-col min-h-screen bg-cream font-sans text-charcoal">
-      {/* 1. Header (Sticks to top) */}
       <Header />
-
-      {/* 2. Main Content (Changes based on Route) */}
       <main className="flex-grow">
         <Outlet />
       </main>
-
-      {/* 3. Footer (Sticks to bottom) */}
       <Footer />
     </div>
   )

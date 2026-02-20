@@ -43,7 +43,7 @@
         {
             "$id": "69738bb80022724714c4",
             "name": "verify-paypal",
-            "runtime": "node-18.0",
+            "runtime": "node-22",
             "specification": "s-0.5vcpu-512mb",
             "execute": [
                 "any"
@@ -61,8 +61,8 @@
             "path": "functions/verify-paypal"
         },
         {
-            "$id": "6977744b0018e73dc81f",
-            "name": "verify-paypal",
+            "$id": "6995675c00210fae6084",
+            "name": "checkAdmin",
             "runtime": "node-22",
             "specification": "s-0.5vcpu-512mb",
             "execute": [
@@ -78,7 +78,7 @@
             "logging": true,
             "entrypoint": "src/main.js",
             "commands": "npm install",
-            "path": "functions/verify-paypal"
+            "path": "functions/checkAdmin"
         }
     ],
     "tablesDB": [

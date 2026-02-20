@@ -51,7 +51,7 @@ const Shop = () => {
         style: [],
         priceRange: [0, 10000],
     });
-    
+
     const [sort, setSort] = useState('newest');
     const [userCountry, setUserCountry] = useState(''); // ✅ Store User Country
     const [currentPage, setCurrentPage] = useState(1);
@@ -83,22 +83,22 @@ const Shop = () => {
 
         if (sort === 'price-low-high') return `${priceColumn}-asc`;
         if (sort === 'price-high-low') return `${priceColumn}-desc`;
-        
+
         return sort;
     };
 
     // --- 3. Fetch Data Effect ---
     useEffect(() => {
         const offset = (currentPage - 1) * itemsPerPage;
-        
+
         // Dispatch with the CALCULATED sort query
-        dispatch(fetchFilteredPaintings({ 
-            filters, 
+        dispatch(fetchFilteredPaintings({
+            filters,
             sort: getSortQuery(), // ✅ Uses dynamic column
-            offset, 
-            limit: itemsPerPage 
+            offset,
+            limit: itemsPerPage
         }));
-        
+
         window.scrollTo(0, 0);
     }, [dispatch, filters, sort, currentPage, userCountry]); // Re-run when country loads
 
@@ -167,11 +167,22 @@ const Shop = () => {
                         {/* Subject Filter */}
                         <FilterSection title="CATEGORIES">
                             {[
-                                'Landscape', 'Still Life', 'Cloudscape',
-                                'Abstract', 'Flora', 'Expressionism',
-                                'Folk Art', 'Tribal Art', 'Digital Art',
-                                'Portrait', 'Woman', 'Pop Art',
-                                'Miniature', 'Misc'
+                                "Landscape",
+                                "Portrait",
+                                "Abstract",
+                                "Still Life",
+                                "Spiritual",
+                                "Contemporary",
+                                "Wildlife",
+                                "Seascape",
+                                "Urban",
+                                "Figurative",
+                                "Minimalist",
+                                "Surrealism",
+                                "Mythological",
+                                "Tribal",
+                                "Calligraphy",
+                                "Botanical"
                             ].map((item) => (
                                 <FilterCheckbox
                                     key={item}
@@ -244,7 +255,7 @@ const Shop = () => {
                                     </span>
                                 )}
                             </p>
-                            
+
                             <div className="flex items-center">
                                 <label htmlFor="sort" className="text-sm text-gray-600 mr-3">Sort by:</label>
                                 <div className="relative">

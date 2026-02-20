@@ -8,6 +8,8 @@ const conf = {
     appwritePaymentFunctionId: String(import.meta.env.VITE_APPWRITE_FUNCTION_ID),
     appwriteUserCollectionId: String(import.meta.env.VITE_APPWRITE_USERS_COLLECTION_ID),
     appwritePaypalClientId: String(import.meta.env.VITE_APPWRITE_PAYPAL_CLIENT_ID),
+    appwritecartsCollectionId: String(import.meta.env.VITE_APPWRITE_CARTS_COLLECTION_ID),
+    appwriteCheckAdminFunctionId: String(import.meta.env.VITE_APPWRITE_CHECK_ADMIN_FUNCTION_ID),
     
 }
 

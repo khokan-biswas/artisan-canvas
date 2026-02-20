@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import authService from '../backend/auth';
+import service from '../backend/config'; // Added to fetch cart
 import { login as authLogin } from '../store/authSlice';
+import { setCart } from '../store/cartSlice'; // Added to update store
 
 const Login = () => {
     const navigate = useNavigate();
@@ -12,7 +14,7 @@ const Login = () => {
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        setError(""); // Clear previous errors
+        setError(""); 
         
         if (!formData.email || !formData.password) {
             setError("Please enter both email and password");
@@ -21,51 +23,53 @@ const Login = () => {
 
         try {
             const session = await authService.login(formData);
-            console.log("Session created:", session);
             
             if (session) {
                 const userData = await authService.getCurrentUser();
-                console.log("User data retrieved:", userData);
                 
                 if (userData) {
                     dispatch(authLogin(userData));
-                    navigate('/'); // Redirect to home
+
+                    // 🛒 SYNC CART: Fetch saved cart from database after login
+                    const dbCart = await service.getCart(userData.$id);
+                    if (dbCart && dbCart.length > 0) {
+                        dispatch(setCart(dbCart));
+                    }
+
+                    navigate('/'); 
                 } else {
-                    setError("Failed to retrieve user information. Please try again.");
+                    setError("Failed to retrieve user information.");
                 }
             } else {
-                setError("Failed to create session. Please try again.");
+                setError("Failed to create session.");
             }
         } catch (error) {
-            console.error("Login error:", error);
-            setError(error?.message || "Login failed. Please check your credentials and try again.");
+            setError(error?.message || "Login failed.");
         }
     };
 
     return (
-        <div className="flex items-center justify-center min-h-[80vh]">
-            <div className="w-full max-w-md bg-white p-8 shadow-lg rounded-sm">
-                <h2 className="text-2xl font-serif font-bold text-center mb-6">Welcome Back</h2>
-                {error && <p className="text-red-500 text-center mb-4">{error}</p>}
+        <div className="flex items-center justify-center min-h-[80vh] bg-cream">
+            <div className="w-full max-w-md bg-white p-8 shadow-lg rounded-sm border border-gray-100">
+                <h2 className="text-2xl font-serif font-bold text-center mb-6 text-charcoal">Welcome Back</h2>
+                {error && <p className="text-red-500 text-sm text-center mb-4 bg-red-50 py-2 rounded-sm">{error}</p>}
                 
                 <form onSubmit={handleLogin} className="space-y-4">
                     <input 
                         type="email" 
                         placeholder="Email" 
-                        autoComplete="email"
-                        className="w-full p-3 border border-gray-300 rounded-sm"
+                        className="w-full p-3 border border-gray-300 rounded-sm focus:border-charcoal outline-none transition"
                         value={formData.email}
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
                     />
                     <input 
                         type="password" 
                         placeholder="Password" 
-                        autoComplete="current-password"
-                        className="w-full p-3 border border-gray-300 rounded-sm"
+                        className="w-full p-3 border border-gray-300 rounded-sm focus:border-charcoal outline-none transition"
                         value={formData.password}
                         onChange={(e) => setFormData({...formData, password: e.target.value})}
                     />
-                    <button type="submit" className="w-full bg-charcoal text-white py-3 font-bold hover:bg-gold transition">
+                    <button type="submit" className="w-full bg-charcoal text-white py-3 font-bold hover:bg-slate-800 transition uppercase tracking-widest text-sm">
                         Log In
                     </button>
                 </form>

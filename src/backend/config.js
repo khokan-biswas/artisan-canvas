@@ -18,6 +18,29 @@ export class Service {
   }
 
   // ==========================================
+  // 🛡️ ADMIN SERVICES
+  // ==========================================
+
+  // ✅ NEW: Check if current user is Admin via Appwrite Function
+  async isUserAdmin() {
+    try {
+      const execution = await this.functions.createExecution(
+        conf.appwriteCheckAdminFunctionId, // Make sure this is in your conf.js!
+        "", // No payload needed for GET
+        false, // Async = false (wait for response)
+        "/",
+        "GET",
+      );
+
+      const response = JSON.parse(execution.responseBody);
+      return response.isAdmin; // Returns true or false
+    } catch (error) {
+      console.error("Appwrite service :: isUserAdmin :: error", error);
+      return false; // Default to false on error for security
+    }
+  }
+
+  // ==========================================
   // 🎨 PAINTINGS (PRODUCTS)
   // ==========================================
 
@@ -100,7 +123,7 @@ export class Service {
   // 📦 ORDERS & PAYMENTS
   // ==========================================
 
-  // 1. Secure PayPal Verification via Function
+  // 1. Secure Payment Verification via Appwrite Function
   async verifyPayment(payload) {
     try {
       const execution = await this.functions.createExecution(
@@ -118,34 +141,35 @@ export class Service {
     }
   }
 
-  // 2. Update Order Details (Status, Completion, etc.)
+  // 2. Update Order Details (Admin status updates)
   async updateOrder(orderId, data) {
     try {
       return await this.databases.updateDocument(
         conf.appwriteDatabaseId,
         conf.appwriteOrdersCollectionId,
         orderId,
-        data, // Expects object like { status: "Shipped" } or { ordercomplete: "yes" }
+        data,
       );
     } catch (error) {
       console.error("Appwrite service :: updateOrder :: error", error);
-      throw error; // Throw error so your frontend catch block can handle it
+      throw error;
     }
   }
 
   // 3. Frontend COD Logic (Direct DB Operations)
+  // ✅ UPDATED: Matching the 'shippingAddress' key from your Checkout component
   async createCODOrder({
     userId,
     items,
     customerName,
     email,
-    shippingDetails,
+    shippingAddress, // Changed from shippingDetails
     totalAmount,
   }) {
     try {
       const paintingIds = Array.isArray(items) ? items : [items];
 
-      // A. Verify Stock First (Read from Paintings)
+      // A. Verify Stock First
       for (const id of paintingIds) {
         const p = await this.databases.getDocument(
           conf.appwriteDatabaseId,
@@ -155,7 +179,7 @@ export class Service {
         if (p.isSold) throw new Error(`Item ${p.title} is already sold.`);
       }
 
-      // B. Mark as Sold (Update Paintings)
+      // B. Mark as Sold
       for (const id of paintingIds) {
         await this.databases.updateDocument(
           conf.appwriteDatabaseId,
@@ -165,15 +189,10 @@ export class Service {
         );
       }
 
-      // C. Create Order (Write to Orders)
-      const shippingString =
-        typeof shippingDetails === "object"
-          ? JSON.stringify(shippingDetails)
-          : String(shippingDetails);
-
+      // C. Create Order Document
       return await this.databases.createDocument(
         conf.appwriteDatabaseId,
-        conf.appwriteOrdersCollectionId, // ✅ Correct Collection for Orders
+        conf.appwriteOrdersCollectionId,
         ID.unique(),
         {
           userId,
@@ -183,8 +202,8 @@ export class Service {
           status: "COD",
           customerName,
           email,
-          shippingAddress: shippingString,
-          ordercomplete: "no", // Based on your schema
+          shippingAddress: shippingAddress, // ✅ Now saves the formatted string correctly
+          ordercomplete: "no",
           currency: "INR",
         },
       );
@@ -194,8 +213,10 @@ export class Service {
     }
   }
 
+  // 4. Fetch Orders
   async getOrders(queries = []) {
     try {
+      // Default to showing newest orders first
       if (!queries.some((q) => q.toString().includes("orderDesc"))) {
         queries.push(Query.orderDesc("$createdAt"));
       }
@@ -209,26 +230,24 @@ export class Service {
       return { documents: [], total: 0 };
     }
   }
-
+  
   // ==========================================
   // 💳 PAYMENT GATEWAY FUNCTIONS
   // ==========================================
 
   // 1. PhonePe Order Creation (Initiate Payment)
-  // This calls your Appwrite Function to generate the secure Checksum & Redirect URL
   async createPhonePeOrder({ userId, amount, orderId, mobileNumber }) {
     try {
       const payload = {
         userId,
-        amount: parseFloat(amount), // Amount in full currency (e.g., 100.00)
-        orderId: orderId || ID.unique(), // Generate or use passed ID
+        amount: parseFloat(amount),
+        orderId: orderId || ID.unique(),
         mobileNumber: mobileNumber || "9999999999",
-        paymentMethod: "PhonePe_Initiate", // Tag for backend router
+        paymentMethod: "PhonePe_Initiate",
       };
 
-      // Call Appwrite Function
       const execution = await this.functions.createExecution(
-        conf.appwritePaymentFunctionId, // Reuse same function ID or create new one
+        conf.appwritePaymentFunctionId,
         JSON.stringify(payload),
         false,
         "/",
@@ -242,8 +261,7 @@ export class Service {
         throw new Error(response.message || "PhonePe initiation failed");
       }
 
-      // Return the payment URL (User should be redirected here)
-      return response.data; // e.g., { redirectUrl: "https://..." }
+      return response.data;
     } catch (error) {
       console.error("Appwrite service :: createPhonePeOrder :: error", error);
       throw error;
@@ -251,12 +269,11 @@ export class Service {
   }
 
   // 2. PayPal Verification (Capture Payment)
-  // This calls your Appwrite Function to validate the Order ID with PayPal
   async verifyPayPalPayment(orderID) {
     try {
       const payload = {
-        orderID, // The ID generated by PayPal frontend SDK
-        paymentMethod: "PayPal", // Tag for backend router
+        orderID,
+        paymentMethod: "PayPal",
       };
 
       const execution = await this.functions.createExecution(
@@ -274,10 +291,79 @@ export class Service {
         throw new Error(response.message || "PayPal verification failed");
       }
 
-      return response; // e.g., { success: true, orderId: "..." }
+      return response;
     } catch (error) {
       console.error("Appwrite service :: verifyPayPalPayment :: error", error);
       throw error;
+    }
+  }
+
+  // ==========================================
+  // 🛒 CART MANAGEMENT (UPDATED FOR ARRAY SCHEMA)
+  // ==========================================
+
+  // 1. Get Cart from DB
+  async getCart(userId) {
+    try {
+      const queries = [Query.equal("userId", userId)];
+      const response = await this.databases.listDocuments(
+        conf.appwriteDatabaseId,
+        conf.appwritecartsCollectionId,
+        queries,
+      );
+
+      if (response.documents.length > 0) {
+        // Since 'items' is an array of strings, we parse each string back to an object
+        const itemsArray = response.documents[0].items;
+        return itemsArray.map((itemString) => JSON.parse(itemString));
+      }
+      return [];
+    } catch (error) {
+      console.log("Appwrite service :: getCart :: error", error);
+      return [];
+    }
+  }
+
+  // 2. Save Cart to DB
+  async saveCart(userId, cartItemsArray) {
+    try {
+      // ✅ Convert each object in the array into its own JSON string
+      // This matches the Appwrite 'string array' type
+      const itemsAsArrayOfStrings = cartItemsArray.map((item) =>
+        JSON.stringify(item),
+      );
+
+      const queries = [Query.equal("userId", userId)];
+
+      const response = await this.databases.listDocuments(
+        conf.appwriteDatabaseId,
+        conf.appwritecartsCollectionId,
+        queries,
+      );
+
+      if (response.documents.length > 0) {
+        // UPDATE existing document
+        return await this.databases.updateDocument(
+          conf.appwriteDatabaseId,
+          conf.appwritecartsCollectionId,
+          response.documents[0].$id,
+          { items: itemsAsArrayOfStrings }, // Send the array of strings
+        );
+      } else {
+        // CREATE new document
+        return await this.databases.createDocument(
+          conf.appwriteDatabaseId,
+          conf.appwritecartsCollectionId,
+          ID.unique(),
+          {
+            userId: userId,
+            items: itemsAsArrayOfStrings, // Send the array of strings
+          },
+        );
+      }
+    } catch (error) {
+      console.log("Appwrite service :: saveCart :: error", error);
+      throw error; // Throwing so the UI can handle the error state
     }
   }
 
@@ -310,6 +396,42 @@ export class Service {
       return url.href || url.toString();
     } catch (error) {
       return null;
+    }
+  }
+
+  // ==========================================
+  // 👤 USER DATABASE SERVICES
+  // ==========================================
+
+  // 1. Get detailed user profile from Database
+  async getUserProfile(userId) {
+    try {
+      return await this.databases.getDocument(
+        conf.appwriteDatabaseId,
+        conf.appwriteUserCollectionId,
+        userId,
+      );
+    } catch (error) {
+      // If document doesn't exist (404), return null instead of throwing error
+      if (error.code === 404) return null;
+      console.error("Appwrite service :: getUserProfile :: error", error);
+      return null;
+    }
+  }
+
+  // 2. Update user profile in Database
+  async updateUserProfile(userId, updateData) {
+    try {
+      // We assume the Document ID is the same as the User Auth ID
+      return await this.databases.updateDocument(
+        conf.appwriteDatabaseId,
+        conf.appwriteUserCollectionId,
+        userId,
+        updateData,
+      );
+    } catch (error) {
+      console.error("Appwrite service :: updateUserProfile :: error", error);
+      throw error;
     }
   }
 }

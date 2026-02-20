@@ -1,291 +1,187 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { addToCart } from '../store/cartSlice';
-import service from '../backend/config.js';
-import authService from '../backend/auth'; 
-import { ShoppingCart, CreditCard, Loader2, X, Eye } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import { logout } from '../store/authSlice.js';
+import { clearCart } from '../store/cartSlice.js';
+import authService from '../backend/auth.js'; 
+import service from '../backend/config.js'; 
+import { ShoppingCart, Menu, X, User, LogOut, Package, LayoutDashboard } from 'lucide-react';
 
-// --- 1. IMPORT YOUR LOCAL IMAGE ---
-import roomBackground from '../assets/istockphoto-1311768804-612x612.jpg';
+const Header = () => {
+    const navigate = useNavigate();
+    const dispatch = useDispatch();
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
 
-const ProductDetails = () => {
-  const { slug } = useParams();
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
+    const authStatus = useSelector((state) => state.auth.status);
+    const cartItems = useSelector((state) => state.cart.cartItems);
+    const userData = useSelector((state) => state.auth.userData);
 
-  const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [activeTab, setActiveTab] = useState('details');
-  const [showARModal, setShowARModal] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(true);
-  
-  // State to store current user status
-  const [currentUser, setCurrentUser] = useState(null);
+    // Get the first letter of name or email for the profile avatar
+    const userInitial = userData?.name?.[0] || userData?.email?.[0] || 'U';
 
-  // FETCH DATA & USER STATUS
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // 1. Fetch User Status
+    useEffect(() => {
+        const verifyAdmin = async () => {
+            if (authStatus && userData) {
+                const status = await service.isUserAdmin();
+                setIsAdmin(status);
+            } else {
+                setIsAdmin(false);
+            }
+        };
+        verifyAdmin();
+    }, [authStatus, userData]);
+
+    const logoutHandler = async () => {
         try {
-            const user = await authService.getCurrentUser();
-            setCurrentUser(user);
-        } catch (err) {
-            // User is guest
-            setCurrentUser(null);
-        }
-
-        // 2. Fetch Product
-        if (!slug) return;
-        const data = await service.getPainting(slug);
-
-        if (data) {
-          const mainImgUrl = service.getThumbnail(data.imageUrl);
-          const galleryUrls = (data.gallery || []).map(idOrUrl =>
-            service.getThumbnail(idOrUrl)
-          );
-
-          setProduct({ ...data, mainImgUrl, galleryUrls });
-          setSelectedImage(mainImgUrl);
-        }
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [slug]);
-
-  // Handle Image Orientation for Smart Fitting
-  useEffect(() => {
-    if (selectedImage) {
-      const img = new Image();
-      img.src = selectedImage;
-      img.onload = () => {
-        setIsLandscape(img.width >= img.height);
-      };
-    }
-  }, [selectedImage]);
-
-  const calculateMRP = (price, discountPercent) => {
-    if (!discountPercent || discountPercent <= 0) return price;
-    const discountedPrice = price - (price * (discountPercent / 100));
-    return Math.round(discountedPrice);
-  };
-
-  // --- 🔒 AUTHENTICATION CHECK HELPER (FIXED) ---
-  const checkAuth = () => {
-    if (!currentUser) {
-        // Show Popup
-        const userWantsToLogin = window.confirm("You cannot perform this without logging in.\n\nDo you want to log in or create an account?");
-        
-        // If they clicked "OK" (Yes)
-        if (userWantsToLogin) {
+            await authService.logout();
+            dispatch(logout());
+            dispatch(clearCart());
             navigate('/login');
+            setIsMobileMenuOpen(false);
+        } catch (error) {
+            console.error("Logout failed", error);
         }
-        
-        // Return false to block the action (Cart/Buy)
-        return false;
-    }
-    // Return true if user IS logged in
-    return true;
-  };
+    };
 
-  const handleAddToCart = () => {
-    if (!checkAuth()) return; // 🛑 Stop if not logged in
+    const navItems = [
+        { name: 'Home', slug: '/', active: true },
+        { name: 'Shop', slug: '/shop', active: true },
+        { name: 'About', slug: '/about', active: true },
+    ];
 
-    if (product) {
-      dispatch(addToCart(product));
-      alert("Added to cart!");
-    }
-  };
+    return (
+        <header className="sticky top-0 z-50 w-full bg-[#FDFBF7]/95 backdrop-blur-sm border-b border-gray-200 shadow-sm transition-all duration-300">
+            <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex items-center justify-between h-20">
+                    
+                    {/* --- LEFT: Logo --- */}
+                    <div className="flex-shrink-0 cursor-pointer" onClick={() => navigate('/')}>
+                        <h1 className="text-2xl font-serif font-bold text-slate-800 tracking-wide">
+                            Artisan Canvas
+                        </h1>
+                    </div>
 
-  const handleBuyNow = () => {
-    if (!checkAuth()) return; // 🛑 Stop if not logged in
+                    {/* --- CENTER: Desktop Navigation --- */}
+                    <div className="hidden md:flex items-center space-x-8">
+                        {navItems.map((item) => (
+                            <Link key={item.name} to={item.slug} className="text-sm font-medium text-gray-600 hover:text-black uppercase tracking-wider transition-colors">
+                                {item.name}
+                            </Link>
+                        ))}
+                    </div>
 
-    if (product) {
-      dispatch(addToCart(product));
-      navigate('/checkout');
-    }
-  };
+                    {/* --- RIGHT: Actions & Profile Section --- */}
+                    <div className="hidden md:flex items-center space-x-6">
+                        
+                        {/* Cart */}
+                        <Link to="/checkout" className="relative group p-2">
+                            <ShoppingCart className="h-6 w-6 text-gray-600 group-hover:text-black transition" />
+                            {cartItems.length > 0 && (
+                                <span className="absolute top-0 right-0 bg-black text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-[#FDFBF7]">
+                                    {cartItems.length}
+                                </span>
+                            )}
+                        </Link>
 
-  if (loading) return <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-charcoal" /></div>;
-  if (!product) return <div className="min-h-screen flex items-center justify-center">Artwork not found.</div>;
+                        {authStatus ? (
+                            <div className="flex items-center gap-6 pl-4 border-l border-gray-200">
+                                
+                                {isAdmin && (
+                                    <Link to="/admin/dashboard" className="flex items-center gap-1.5 text-sm font-bold text-blue-600 hover:text-blue-800 transition" title="Admin Dashboard">
+                                        <LayoutDashboard size={18} />
+                                        <span>Admin</span>
+                                    </Link>
+                                )}
 
-  const allImages = [product.mainImgUrl, ...product.galleryUrls];
-  const mrpINR = calculateMRP(product.pricein, product.discountin);
-  const mrpUSD = calculateMRP(product.priceusd, product.discountusd);
+                                <Link to="/orders" className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-black transition" title="My Orders">
+                                    <Package size={18} />
+                                    <span>Orders</span>
+                                </Link>
 
-  return (
-    <div className="bg-[#F9F7F2] min-h-screen font-serif relative">
+                                <button onClick={logoutHandler} className="flex items-center gap-1.5 text-sm font-medium text-red-500 hover:text-red-700 transition" title="Logout">
+                                    <LogOut size={18} />
+                                    <span>Logout</span>
+                                </button>
 
-      <main className="container mx-auto px-4 py-10">
-        <div className="text-sm text-gray-500 mb-8">Home &gt; Artists &gt; {product.artist} &gt; {product.title}</div>
+                                {/* --- 👤 PROFILE LOGO (FAR RIGHT) --- */}
+                                <Link 
+                                    to="/user-details" 
+                                    className="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-sm border-2 border-transparent hover:border-slate-800 hover:bg-white hover:text-slate-800 transition-all duration-300 uppercase shadow-sm"
+                                    title="Profile Settings"
+                                >
+                                    {userInitial}
+                                </Link>
+                            </div>
+                        ) : (
+                            <Link to="/login" className="flex items-center gap-2 text-sm font-bold text-black border border-black px-6 py-2 rounded-sm hover:bg-black hover:text-white transition uppercase tracking-widest">
+                                <User size={18} /> Login
+                            </Link>
+                        )}
+                    </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-
-          {/* LEFT: IMAGES */}
-          <div className="space-y-6">
-            {/* Main Smart Box */}
-            <div className="bg-white p-4 shadow-sm border border-[#EBE7DE] aspect-[4/3] flex items-center justify-center bg-gray-50 overflow-hidden relative">
-              <img
-                src={selectedImage}
-                alt={product.title}
-                className={`block shadow-md transition-all duration-300 ${isLandscape ? 'w-full h-auto' : 'h-full w-auto'}`}
-              />
+                    {/* --- MOBILE: Menu Button --- */}
+                    <div className="md:hidden flex items-center gap-4">
+                        <Link to="/checkout" className="relative p-2">
+                             <ShoppingCart size={24} className="text-gray-700" />
+                             {cartItems.length > 0 && (
+                                <span className="absolute top-0 right-0 bg-black text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
+                                    {cartItems.length}
+                                </span>
+                             )}
+                        </Link>
+                        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-1">
+                            {isMobileMenuOpen ? <X size={30} /> : <Menu size={30} />}
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            {/* Thumbnails */}
-            {allImages.length > 1 && (
-              <div className="flex space-x-4 overflow-x-auto pb-2">
-                {allImages.map((img, index) => (
-                  <button key={index} onClick={() => setSelectedImage(img)} className={`border-2 p-1 w-20 h-20 flex-shrink-0 bg-white ${selectedImage === img ? 'border-charcoal' : 'border-transparent'}`}>
-                    <img src={img} className="w-full h-full object-cover" alt="thumbnail" />
-                  </button>
-                ))}
-              </div>
+            {/* --- MOBILE MENU DRAWER --- */}
+            {isMobileMenuOpen && (
+                <div className="md:hidden bg-[#FDFBF7] border-t border-gray-200 absolute w-full left-0 shadow-xl p-6 space-y-4">
+                    
+                    {authStatus && (
+                        <Link to="/user-details" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-4 pb-4 border-b border-gray-100">
+                             <div className="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-lg uppercase">
+                                {userInitial}
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-bold text-black uppercase tracking-widest">Profile Settings</span>
+                                <span className="text-xs text-gray-500 truncate max-w-[200px]">{userData?.email}</span>
+                            </div>
+                        </Link>
+                    )}
+
+                    {navItems.map((item) => (
+                        <Link key={item.name} to={item.slug} onClick={() => setIsMobileMenuOpen(false)} className="block py-2 text-lg font-medium text-gray-700 hover:text-black transition">
+                            {item.name}
+                        </Link>
+                    ))}
+                    
+                    <div className="pt-4 border-t border-gray-100 flex flex-col gap-4">
+                        <Link to="/orders" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 text-gray-700 font-medium">
+                            <Package size={20}/> My Orders
+                        </Link>
+                        {isAdmin && (
+                            <Link to="/admin/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 text-blue-600 font-bold">
+                                <LayoutDashboard size={20}/> Admin Dashboard
+                            </Link>
+                        )}
+                        {authStatus ? (
+                            <button onClick={logoutHandler} className="flex items-center gap-3 text-red-600 font-bold py-2">
+                                <LogOut size={20}/> Logout Account
+                            </button>
+                        ) : (
+                            <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="w-full bg-black text-white text-center py-3 rounded-sm font-bold uppercase tracking-widest text-xs">
+                                Login / Register
+                            </Link>
+                        )}
+                    </div>
+                </div>
             )}
-
-            <button
-              onClick={() => setShowARModal(true)}
-              className="flex items-center justify-center space-x-2 w-full py-3 border border-charcoal text-charcoal font-medium hover:bg-charcoal hover:text-white transition"
-            >
-              <Eye size={20} />
-              <span>View in Room (AR)</span>
-            </button>
-          </div>
-
-          {/* RIGHT: INFO */}
-          <div className="space-y-8">
-            <h1 className="text-4xl font-bold text-charcoal">{product.title}</h1>
-
-            <div className="space-y-2 border-b border-[#EBE7DE] pb-6">
-              <div className="flex items-center space-x-3 text-lg">
-                <span className="font-bold text-charcoal text-2xl">₹{mrpINR?.toLocaleString()}</span>
-                {product.discountin > 0 && (
-                  <>
-                    <span className="line-through text-gray-400">₹{product.pricein?.toLocaleString()}</span>
-                    <span className="text-green-700 bg-green-100 px-2 py-0.5 text-sm font-bold rounded">{product.discountin}% OFF</span>
-                  </>
-                )}
-              </div>
-              <div className="flex items-center space-x-3 text-base text-gray-600">
-                <span className="font-semibold">${mrpUSD?.toLocaleString()}</span>
-                {product.discountusd > 0 && (
-                  <>
-                    <span className="line-through text-gray-400 text-sm">${product.priceusd?.toLocaleString()}</span>
-                    <span className="text-green-700 text-xs font-bold">{product.discountusd}% OFF</span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="flex space-x-4">
-              {product.isSold ? (
-                <button disabled className="w-full py-4 bg-gray-300 text-gray-500 font-bold cursor-not-allowed">SOLD OUT</button>
-              ) : (
-                <>
-                  <button onClick={handleAddToCart} className="flex-1 flex items-center justify-center space-x-2 py-3 bg-charcoal text-white font-medium hover:bg-opacity-90 transition">
-                    <ShoppingCart size={20} /><span>Add to Cart</span>
-                  </button>
-                  <button onClick={handleBuyNow} className="flex-1 flex items-center justify-center space-x-2 py-3 bg-white border border-charcoal text-charcoal font-medium hover:bg-gray-50 transition">
-                    <CreditCard size={20} /><span>Buy Now</span>
-                  </button>
-                </>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-y-2 text-sm text-gray-700 py-4 font-sans">
-              <p><span className="font-bold text-charcoal">Dimensions:</span> {product.width}" x {product.height}"</p>
-              <p><span className="font-bold text-charcoal">Medium:</span> {product.medium}</p>
-              <p><span className="font-bold text-charcoal">Style:</span> {product.style}</p>
-              <p><span className="font-bold text-charcoal">Subject:</span> {product.category}</p>
-              <p className="col-span-2"><span className="font-bold text-charcoal">Frame:</span> {product.frameStatus}</p>
-            </div>
-
-            <div className="flex items-start space-x-4 p-4 bg-white border border-[#EBE7DE] rounded-sm">
-              <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-xl">🎨</div>
-              <div>
-                <h3 className="font-bold text-charcoal">{product.artist}</h3>
-                <p className="text-sm text-gray-500">Verified Artist on Artisan Canvas.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* TABS */}
-        <div className="mt-16">
-          <div className="flex border-b border-[#EBE7DE] space-x-8">
-            <button className={`pb-4 text-lg font-medium ${activeTab === 'details' ? 'text-charcoal border-b-2 border-charcoal' : 'text-gray-500'}`} onClick={() => setActiveTab('details')}>Description</button>
-            <button className={`pb-4 text-lg font-medium ${activeTab === 'shipping' ? 'text-charcoal border-b-2 border-charcoal' : 'text-gray-500'}`} onClick={() => setActiveTab('shipping')}>Shipping Info</button>
-          </div>
-          <div className="py-8 text-gray-700 leading-relaxed max-w-3xl">
-            {activeTab === 'details' && <p>{product.description}</p>}
-            {activeTab === 'shipping' && <div><p>Paintings are carefully rolled in hard PVC pipes. Delivery usually takes 5-7 business days.</p></div>}
-          </div>
-        </div>
-      </main>
-
-      {/* --- ROOM VIEW MODAL (USING LOCAL ISTOCK IMAGE) --- */}
-      {showARModal && (
-        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="relative bg-white w-full max-w-6xl h-[90vh] rounded-none overflow-hidden shadow-2xl flex flex-col">
-
-            <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-20 bg-gradient-to-b from-black/80 to-transparent">
-              <h3 className="text-white font-bold text-lg drop-shadow-md tracking-wider uppercase">Living Room Visualization</h3>
-              <button onClick={() => setShowARModal(false)} className="bg-black/40 hover:bg-black/60 p-2 rounded-full text-white backdrop-blur-md transition">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="relative w-full h-full bg-gray-900 flex items-center justify-center overflow-hidden">
-
-              {/* --- 2. THE LOCAL ROOM IMAGE --- */}
-              <img
-                src={roomBackground}
-                alt="Living Room Visualization"
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-
-              {/* --- 3. DYNAMIC FRAMED PAINTING (STRICT SIZING) --- */}
-              <div
-                className="absolute top-[18%] left-1/2 -translate-x-1/2 z-10 shadow-[0_30px_60px_rgba(0,0,0,0.7)] transform hover:scale-105 transition-all duration-500 cursor-move"
-                style={{
-                  maxWidth: '350px',
-                  maxHeight: '280px',
-                  width: 'auto',
-                  height: 'auto',
-                  border: '12px solid #111',
-                  backgroundColor: '#fff',
-                  padding: '10px',
-                  outline: '1px solid #444',
-                  boxSizing: 'border-box'
-                }}
-              >
-                <img
-                  src={selectedImage}
-                  alt="Framed Painting"
-                  className="block w-full h-full object-contain"
-                  style={{
-                    maxHeight: '240px' 
-                  }}
-                />
-                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/canvas-orange.png')] opacity-10 pointer-events-none"></div>
-              </div>
-            </div>
-
-            <div className="bg-black text-gray-400 p-4 text-center text-[10px] tracking-widest uppercase">
-              Simulation for visualization. Actual painting size is {product.width}" x {product.height}".
-            </div>
-          </div>
-        </div>
-      )}
-
-    </div>
-  );
+        </header>
+    );
 };
 
-export default ProductDetails;
+export default Header;

@@ -9,6 +9,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 // import { PayPalScriptProvider } from "@paypal/react-paypal-js"; // REMOVE THIS
 
 import AuthLayout from './components/AuthLayout.jsx';
+import UserDetails from './pages/UserDetails.jsx';
 
 // ... (Keep all your Lazy Imports and PageLoader as they were) ...
 const HomePage = React.lazy(() => import('./pages/HomePage.jsx'));
@@ -76,6 +77,10 @@ const router = createBrowserRouter([
       {
         path: "/checkout",
         element: <AuthLayout authentication={true}><Suspense fallback={<PageLoader />}><Checkout /></Suspense></AuthLayout>
+      },
+      {
+        path: "/user-details",
+        element: <AuthLayout authentication={true}><Suspense fallback={<PageLoader />}><UserDetails/> </Suspense></AuthLayout>
       },
       {
         path: "/orders",

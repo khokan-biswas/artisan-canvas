@@ -60,15 +60,17 @@ const AdminProducts = () => {
           await Promise.all(promises);
           alert("Discount applied successfully!");
           window.location.reload(); // Refresh to see changes
-      } catch (error) {
-          console.error("Error applying discount", error);
-          alert("Failed to apply discount");
-      } finally {
-          setApplyingDiscount(false);
-      }
-  };
+        } catch (error) {
+            console.error("Error applying discount", error);
+            alert("Failed to apply discount");
+        } finally {
+            setApplyingDiscount(false);
+        }
+    };
+    
+    // console.log("this is : ", products);
 
-  return (
+    return (
     <div className="min-h-screen bg-cream flex font-sans text-charcoal">
       {/* Sidebar (Same as before) */}
       <aside className="w-64 bg-beige-light border-r border-beige-border fixed h-full hidden md:flex flex-col z-20">
@@ -128,8 +130,9 @@ const AdminProducts = () => {
                             <th className="px-6 py-4 font-semibold">Product Name</th>
                             <th className="px-6 py-4 font-semibold">Status</th>
                             <th className="px-6 py-4 font-semibold">PriceIND</th>
+                            <th className="px-6 py-4 font-semibold">DiscountIND</th>
                             <th className="px-6 py-4 font-semibold">PriceUSD</th>
-                            <th className="px-6 py-4 font-semibold">Discount</th>
+                            <th className="px-6 py-4 font-semibold">DiscountUSD</th>
                             <th className="px-6 py-4 font-semibold text-right">Actions</th>
                         </tr>
                     </thead>
@@ -142,11 +145,13 @@ const AdminProducts = () => {
                                         <OptimizedImage src={service.getThumbnail(product.imageUrl)} alt={product.title} className="h-full w-full object-cover" />
                                     </div>
                                 </td>
+                                
                                 <td className="px-6 py-3">
                                     <div className="font-medium text-charcoal">{product.title}</div>
                                 </td>
                                 <td className="px-6 py-3"><StatusBadge status={product.isSold} /></td>
                                 <td className="px-6 py-3 font-medium">₹{product.pricein?.toLocaleString()}</td>
+                                <td className="px-6 py-3 text-red-500 font-bold">{product.discountin > 0 ? `${product.discountin}% OFF` : '-'}</td>
                                 <td className="px-6 py-3 font-medium">${product.priceusd?.toLocaleString()}</td>
                                 <td className="px-6 py-3 text-red-500 font-bold">{product.discountusd > 0 ? `${product.discountusd}% OFF` : '-'}</td>
                                 <td className="px-6 py-3 text-right">

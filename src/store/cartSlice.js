@@ -1,6 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
 
-// Load initial state from LocalStorage
 const loadCartFromStorage = () => {
   const savedCart = localStorage.getItem("cart");
   return savedCart ? JSON.parse(savedCart) : [];
@@ -14,7 +13,12 @@ const cartSlice = createSlice({
   name: "cart",
   initialState,
   reducers: {
-    // Action: Add Item
+    // Overwrite cart (used when syncing from Appwrite)
+    setCart: (state, action) => {
+        state.cartItems = action.payload;
+        localStorage.setItem("cart", JSON.stringify(state.cartItems));
+    },
+
     addToCart: (state, action) => {
       const painting = action.payload;
       const exists = state.cartItems.find((item) => item.$id === painting.$id);
@@ -24,27 +28,22 @@ const cartSlice = createSlice({
       }
     },
 
-    // Action: Remove Item
     removeFromCart: (state, action) => {
       const paintingId = action.payload;
       state.cartItems = state.cartItems.filter((item) => item.$id !== paintingId);
       localStorage.setItem("cart", JSON.stringify(state.cartItems));
     },
 
-    // Action: Clear Cart
     clearCart: (state) => {
       state.cartItems = [];
       localStorage.removeItem("cart");
     },
 
-    // 👇 NEW: Update availability status dynamically
     syncCartAvailability: (state, action) => {
-        const freshItems = action.payload; // Array of latest painting objects from DB
-        
+        const freshItems = action.payload;
         state.cartItems = state.cartItems.map(cartItem => {
             const freshItem = freshItems.find(p => p.$id === cartItem.$id);
             if (freshItem) {
-                // Update isSold status and latest price info just in case
                 return { 
                     ...cartItem, 
                     isSold: freshItem.isSold,
@@ -60,6 +59,5 @@ const cartSlice = createSlice({
   },
 });
 
-export const { addToCart, removeFromCart, clearCart, syncCartAvailability } = cartSlice.actions;
-
+export const { setCart, addToCart, removeFromCart, clearCart, syncCartAvailability } = cartSlice.actions;
 export default cartSlice.reducer;
