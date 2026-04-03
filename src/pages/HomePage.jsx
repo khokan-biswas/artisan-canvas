@@ -5,6 +5,8 @@ import { fetchCategoryPaintings } from '../store/shopSlice';
 import { Loader2, ArrowRight } from 'lucide-react';
 import ProductCard from '../components/ProductCard.jsx';
 import service from '../backend/config';
+import { Helmet } from 'react-helmet-async';
+import HeroImage from '../components/HeroImage.jsx';
 
 // ⚠️ Ensure this image exists in your assets folder, or change the path
 import HERO_IMAGE_URL from '../assets/Gemini_Generated_Image_ys2ex3ys2ex3ys2e.png';
@@ -45,7 +47,7 @@ const SectionRow = ({ title, linkTo, paintings, loading, id }) => {
       </div>
 
       {/* Grid - Strictly 5 columns */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-3 lg:grid-cols-5 gap-6">
         {paintings.slice(0, 5).map((painting) => (
           <div key={painting.$id} className="w-full h-full">
             <ProductCard painting={painting} />
@@ -79,16 +81,19 @@ const HomePage = () => {
   };
 
   return (
-    <div className="bg-[#FDFBF7] min-h-screen">
+    <div className="bg-[#FDFBF7] min-h-screen overflow-x-hidden">
+      <Helmet>
+        <title>Adhunik Art | Original Modern Indian Paintings & Gallery</title>
+        <meta name="description" content="Explore Adhunik Art for unique, original modern paintings. Buy contemporary Indian art, landscapes, and spiritual masterpieces directly from the artist." />
+        <link rel="canonical" href="https://adhunikart.art" />
+      </Helmet>
 
       {/* --- HERO SECTION --- */}
-      <div className="relative w-full h-[50vh] md:h-[60vh] overflow-hidden bg-charcoal">
-        <img
+      <div className="relative w-full h-[45vh] md:h-[60vh] overflow-hidden bg-charcoal">
+        <HeroImage
           src={HERO_IMAGE_URL}
-          // fallback in case image is missing
-          onError={(e) => e.target.style.display = 'none'}
           alt="Gallery Interior"
-          className="w-full h-full object-cover object-center opacity-90"
+          className="absolute inset-0 w-full h-full object-cover object-center opacity-90"
         />
         <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center px-4">
           <h1 className="text-4xl md:text-6xl font-serif text-white mb-6 drop-shadow-xl tracking-wide">
@@ -101,12 +106,11 @@ const HomePage = () => {
       </div>
 
       {/* --- STICKY CATEGORY NAV --- */}
-      <div className="sticky top-16 z-30 bg-[#FDFBF7]/95 backdrop-blur-sm border-b border-gray-200 shadow-sm py-4">
+      <div className="sticky top-20 z-30 bg-[#FDFBF7]/95 backdrop-blur-sm border-b border-gray-200 shadow-sm py-4">
         <div className="max-w-[1400px] mx-auto px-4 overflow-x-auto no-scrollbar">
-          <div className="flex space-x-4 min-w-max">
+          <div className="flex flex-nowrap gap-2 justify-center md:justify-start min-w-max">
             {CATEGORIES.map((cat) => {
               const catData = categoriesState[cat] || { items: [] };
-              // Use the first painting's image as the category thumbnail
               const thumbId = catData.items[0]?.imageUrl;
               const thumbUrl = thumbId ? service.getThumbnail(thumbId) : null;
 
@@ -114,19 +118,19 @@ const HomePage = () => {
                 <button
                   key={cat}
                   onClick={() => scrollToSection(cat)}
-                  className="flex flex-col items-center group cursor-pointer focus:outline-none"
+                  className="flex flex-col items-center justify-center w-20 h-14 rounded-md border border-gray-200 bg-white text-[10px] text-center px-2 py-2 hover:border-charcoal hover:shadow-sm transition focus:outline-none"
                 >
-                  <div className="w-28 h-16 border border-gray-300 rounded-md flex items-center justify-center bg-white hover:border-charcoal hover:shadow-md transition-all duration-300 relative overflow-hidden">
+                  <div className="w-14 h-10 border border-gray-300 rounded-md flex items-center justify-center bg-white hover:border-charcoal hover:shadow-sm transition-all duration-300 relative overflow-hidden">
                     {thumbUrl ? (
                       <img src={thumbUrl} alt={cat} className="w-full h-full object-cover object-center" />
                     ) : (
-                      <span className="text-xs font-serif font-bold text-gray-400 group-hover:text-charcoal uppercase tracking-widest z-10">
-                        {cat.split(' ')[0]}
+                      <span className="text-[10px] font-serif font-semibold text-gray-400 group-hover:text-charcoal uppercase tracking-[0.15em] z-10">
+                        {cat.split(' ')[0].slice(0, 3)}
                       </span>
                     )}
                     <div className="absolute inset-0 bg-gray-50 opacity-0 group-hover:opacity-20 transition-opacity" />
                   </div>
-                  <span className="mt-2 text-xs font-medium text-gray-500 group-hover:text-charcoal uppercase tracking-wide">
+                  <span className="mt-1 text-[10px] font-medium text-gray-500 group-hover:text-charcoal uppercase leading-none truncate">
                     {cat}
                   </span>
                 </button>

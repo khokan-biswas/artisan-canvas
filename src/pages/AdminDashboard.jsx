@@ -246,7 +246,7 @@ const AdminDashboard = () => {
             setGraphData(chartData);
 
         } catch (error) {
-            console.error("Dashboard Error:", error);
+//             console.error("Dashboard Error:", error);
         } finally {
             setLoading(false);
         }
@@ -268,7 +268,7 @@ const AdminDashboard = () => {
       {/* Sidebar */}
       <aside className="w-64 bg-[#F9F7F2] border-r border-[#EBE7DE] fixed h-full hidden md:flex flex-col z-20">
         <div className="p-8">
-            <h1 className="text-2xl font-serif text-charcoal">Artisan Canvas</h1>
+            <h1 className="text-2xl font-serif text-charcoal">Adhunic Art</h1>
         </div>
         <nav className="flex-1 px-4 space-y-2">
             <SidebarItem icon={LayoutDashboard} label="Dashboard" active={true} to="/admin/dashboard" />
@@ -297,7 +297,7 @@ const AdminDashboard = () => {
         ) : (
             <>
                 {/* Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
                     
                     {/* 1. Revenue USD */}
                     <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">

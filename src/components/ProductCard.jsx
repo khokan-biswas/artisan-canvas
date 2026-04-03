@@ -1,12 +1,13 @@
 import React, { memo, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import OptimizedImage from './OptimizedImage.jsx';
 import service from '../backend/config';
 
 const ProductCard = memo(({ painting }) => {
 
   // --- 0. SAFETY CHECK ---
   if (!painting) {
-    console.warn("ProductCard: Missing painting data");
+//     console.warn("ProductCard: Missing painting data");
     return null;
   }
 
@@ -16,27 +17,24 @@ const ProductCard = memo(({ painting }) => {
     return service.getThumbnail(painting.imageUrl);
   }, [painting.imageUrl]);
 
-  // --- 2. PRICE & MRP CALCULATION ---
-  // Formula: MRP = SellingPrice / (1 - Discount/100)
-
-  const calculateMRP = (price, discountPercent) => {
+  // --- 2. PRICE & DISCOUNT CALCULATION ---
+  const calculateFinalPrice = (price, discountPercent) => {
     if (!discountPercent || discountPercent <= 0) return price;
 
-    // Formula: Price - (Price * (Discount / 100))
     const discountedPrice = price - (price * (discountPercent / 100));
-
     return Math.round(discountedPrice);
   };
 
   // USD Data
-  const sellingUSD = painting.priceusd || 0;
-  const discountUSD = painting.discountusd || 0;
-  const mrpUSD = calculateMRP(sellingUSD, discountUSD);
+  const sellingUSD = painting.priceusd || painting.price || 0;
+  const discountUSD = Number(painting.discountusd ?? painting.discount ?? 0);
+  const finalUSD = calculateFinalPrice(sellingUSD, discountUSD);
 
   // INR Data
   const sellingINR = painting.pricein || 0;
-  const discountINR = painting.discountin || 0;
-  const mrpINR = calculateMRP(sellingINR, discountINR);
+  const discountINR = Number(painting.discountin ?? painting.discount ?? 0);
+  const finalINR = calculateFinalPrice(sellingINR, discountINR);
+  const hasDiscount = discountUSD > 0 || discountINR > 0;
 
   return (
     <Link to={`/product/${painting.$id}`} className="group cursor-pointer block h-full">
@@ -44,6 +42,13 @@ const ProductCard = memo(({ painting }) => {
 
         {/* --- IMAGE CONTAINER --- */}
         <div className="w-full mb-4 relative aspect-[4/5] overflow-hidden bg-gray-100 rounded-sm">
+
+          {/* SALE BADGE */}
+          {(!painting.isSold && hasDiscount) && (
+            <div className="absolute top-3 right-3 z-20 bg-red-600 text-white text-[10px] font-bold uppercase tracking-[0.18em] px-2 py-1 rounded-full shadow-sm">
+              Sale
+            </div>
+          )}
 
           {/* SOLD OUT BADGE */}
           {painting.isSold && (
@@ -55,11 +60,13 @@ const ProductCard = memo(({ painting }) => {
           )}
 
           {/* IMAGE */}
-          <img
+          <OptimizedImage
             src={imageUrl}
             alt={painting.title}
-            loading="lazy"
-            className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ${painting.isSold ? 'grayscale' : ''}`}
+            width={480}
+            height={600}
+            className={`transition-transform duration-700 group-hover:scale-110 ${painting.isSold ? 'grayscale' : ''}`}
+            containerClassName="w-full h-full"
           />
 
           {/* HOVER ACTION (Quick Add) */}
@@ -90,9 +97,9 @@ const ProductCard = memo(({ painting }) => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-xl font-bold text-charcoal font-serif">
-                  ${mrpUSD.toLocaleString()}
+                  ${finalUSD.toLocaleString()}
                 </span>
-                {mrpUSD && (
+                {discountUSD > 0 && sellingUSD > finalUSD && (
                   <span className="text-xs text-gray-400 line-through decoration-gray-300">
                     ${sellingUSD.toLocaleString()}
                   </span>
@@ -109,9 +116,9 @@ const ProductCard = memo(({ painting }) => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-gray-600 font-serif">
-                  ₹{mrpINR.toLocaleString()}
+                  ₹{finalINR.toLocaleString()}
                 </span>
-                {mrpINR && (
+                {discountINR > 0 && sellingINR > finalINR && (
                   <span className="text-[10px] text-gray-300 line-through">
                     ₹{sellingINR.toLocaleString()}
                   </span>

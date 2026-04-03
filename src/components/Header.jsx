@@ -1,36 +1,45 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../store/authSlice.js';
 import { clearCart } from '../store/cartSlice.js';
-import authService from '../backend/auth.js'; 
-import service from '../backend/config.js'; 
-import { ShoppingCart, Menu, X, User, LogOut, Package, LayoutDashboard } from 'lucide-react';
+import authService from '../backend/auth.js';
+import { ShoppingCart, Menu, X, User, LogOut, Package, LayoutDashboard, Home, Info, Users, Palette } from 'lucide-react';
 
 const Header = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const [isAdmin, setIsAdmin] = useState(false);
+    const [hideHeader, setHideHeader] = useState(false);
+    const prevScrollY = useRef(0);
 
     const authStatus = useSelector((state) => state.auth.status);
     const cartItems = useSelector((state) => state.cart.cartItems);
     const userData = useSelector((state) => state.auth.userData);
+    const location = useLocation();
+    const ADMIN_EMAIL = "s9618137@gmail.com";
+    const isAdmin = userData?.email === ADMIN_EMAIL;
+    const isAdminPath = location.pathname.startsWith('/admin');
+    const showAdminBar = isAdmin && isAdminPath;
+    const showMobileNav = !isAdminPath;
 
     // Get the first letter of name or email for the profile avatar
     const userInitial = userData?.name?.[0] || userData?.email?.[0] || 'U';
 
     useEffect(() => {
-        const verifyAdmin = async () => {
-            if (authStatus && userData) {
-                const status = await service.isUserAdmin();
-                setIsAdmin(status);
+        const handleScroll = () => {
+            const currentScroll = window.pageYOffset;
+            if (currentScroll > prevScrollY.current && currentScroll > 80) {
+                setHideHeader(true);
             } else {
-                setIsAdmin(false);
+                setHideHeader(false);
             }
+            prevScrollY.current = currentScroll;
         };
-        verifyAdmin();
-    }, [authStatus, userData]);
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const logoutHandler = async () => {
         try {
@@ -40,7 +49,7 @@ const Header = () => {
             navigate('/login');
             setIsMobileMenuOpen(false);
         } catch (error) {
-            console.error("Logout failed", error);
+//             console.error("Logout failed", error);
         }
     };
 
@@ -50,22 +59,22 @@ const Header = () => {
         { name: 'About', slug: '/about', active: true },
     ];
 
-    return (
-        <header className="sticky top-0 z-50 w-full bg-[#FDFBF7]/95 backdrop-blur-sm border-b border-gray-200 shadow-sm transition-all duration-300">
+    return (<>
+        <header className={`sticky top-0 z-50 w-full bg-[#FDFBF7]/95 backdrop-blur-sm border-b border-gray-200 shadow-sm transition-all duration-300 transform ${hideHeader ? '-translate-y-full' : 'translate-y-0'}`}>
             <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-20">
                     
                     {/* --- LEFT: Logo --- */}
                     <div className="flex-shrink-0 cursor-pointer" onClick={() => navigate('/')}>
                         <h1 className="text-2xl font-serif font-bold text-slate-800 tracking-wide">
-                            Artisan Canvas
+                            Adhunic Art
                         </h1>
                     </div>
 
                     {/* --- CENTER: Desktop Navigation --- */}
-                    <div className="hidden md:flex items-center space-x-8">
+                    <div className="hidden md:flex items-center space-x-5 overflow-x-auto no-scrollbar">
                         {navItems.map((item) => (
-                            <Link key={item.name} to={item.slug} className="text-sm font-medium text-gray-600 hover:text-black uppercase tracking-wider transition-colors">
+                            <Link key={item.name} to={item.slug} className="text-sm font-medium text-gray-600 hover:text-black uppercase tracking-wider transition-colors whitespace-nowrap">
                                 {item.name}
                             </Link>
                         ))}
@@ -181,7 +190,66 @@ const Header = () => {
                 </div>
             )}
         </header>
-    );
+
+        {showAdminBar && (
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#F8FBFF] border-t border-gray-200 shadow-xl">
+                <div className="flex items-center justify-around gap-2 px-2 py-2 overflow-x-auto">
+                    {[
+                        { label: 'Dashboard', to: '/admin/dashboard', icon: <LayoutDashboard size={18} /> },
+                        { label: 'Products', to: '/admin/products', icon: <Package size={18} /> },
+                        { label: 'Orders', to: '/admin/orders', icon: <ShoppingCart size={18} /> },
+                        { label: 'Customers', to: '/admin/customers', icon: <Users size={18} /> },
+                        { label: 'Upload', to: '/admin/upload', icon: <Palette size={18} /> },
+                    ].map((link) => (
+                        <button
+                            key={link.to}
+                            type="button"
+                            onClick={() => { navigate(link.to); setIsMobileMenuOpen(false); }}
+                            className="flex flex-col items-center justify-center flex-shrink-0 w-16 h-16 rounded-2xl bg-white text-charcoal shadow-sm"
+                        >
+                            {link.icon}
+                            <span className="mt-1 text-[10px] font-semibold text-gray-600 text-center leading-tight">{link.label}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {/* Mobile Bottom Navbar */}
+        {showMobileNav && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-xl">
+            <nav className="flex items-center justify-between px-4 py-3">
+                <button type="button" onClick={() => { navigate('/'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
+                    <Home size={20} />
+                    <span>Home</span>
+                </button>
+                <button type="button" onClick={() => { navigate('/shop'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
+                    <ShoppingCart size={20} />
+                    <span>Shop</span>
+                </button>
+                <button type="button" onClick={() => { navigate('/about'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
+                    <Info size={20} />
+                    <span>About</span>
+                </button>
+                <button type="button" onClick={() => { navigate(authStatus ? '/user-details' : '/login'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
+                    <User size={20} />
+                    <span>Profile</span>
+                </button>
+                {authStatus ? (
+                    <button type="button" onClick={logoutHandler} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-red-500 hover:text-red-700 transition">
+                        <LogOut size={20} />
+                        <span>Logout</span>
+                    </button>
+                ) : (
+                    <button type="button" onClick={() => { navigate('/login'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
+                        <LogOut size={20} />
+                        <span>Login</span>
+                    </button>
+                )}
+            </nav>
+        </div>
+        )}
+    </>);
 };
 
 export default Header;

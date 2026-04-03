@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import compression from 'vite-plugin-compression';
+import Sitemap from 'vite-plugin-sitemap';
 
 export default defineConfig({
   plugins: [
@@ -14,6 +15,10 @@ export default defineConfig({
       threshold: 1024,
       algorithm: 'gzip',
       ext: '.gz',
+    }),
+    Sitemap({ 
+      hostname: 'https://adhunikart.art',
+      dynamicRoutes: ['/gallery', '/about', '/contact'] 
     }),
   ],
   build: {

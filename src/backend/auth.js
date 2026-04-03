@@ -42,7 +42,7 @@ export class AuthService {
             },
           );
         } catch (dbError) {
-          console.warn("DB Save Error:", dbError);
+//           console.warn("DB Save Error:", dbError);
         }
         return userAccount;
       }
@@ -60,7 +60,7 @@ export class AuthService {
       // 'account' is your new Account(this.client) instance
       return await this.account.updateName(name);
     } catch (error) {
-      console.error("Appwrite auth :: updateName :: error", error);
+//       console.error("Appwrite auth :: updateName :: error", error);
       throw error;
     }
   }

@@ -53,7 +53,7 @@ const UserDetails = () => {
                     });
                 }
             } catch (error) {
-                console.error("Failed to load profile", error);
+//                 console.error("Failed to load profile", error);
             } finally {
                 setLoading(false);
             }

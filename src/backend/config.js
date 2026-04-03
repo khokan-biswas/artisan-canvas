@@ -35,7 +35,7 @@ export class Service {
       const response = JSON.parse(execution.responseBody);
       return response.isAdmin; // Returns true or false
     } catch (error) {
-      console.error("Appwrite service :: isUserAdmin :: error", error);
+//       console.error("Appwrite service :: isUserAdmin :: error", error);
       return false; // Default to false on error for security
     }
   }
@@ -52,7 +52,7 @@ export class Service {
         id,
       );
     } catch (error) {
-      console.error("Appwrite service :: getPainting :: error", error);
+//       console.error("Appwrite service :: getPainting :: error", error);
       return false;
     }
   }
@@ -65,7 +65,7 @@ export class Service {
         queries,
       );
     } catch (error) {
-      console.error("Appwrite service :: getPaintings :: error", error);
+//       console.error("Appwrite service :: getPaintings :: error", error);
       return { documents: [], total: 0 };
     }
   }
@@ -86,7 +86,7 @@ export class Service {
         },
       );
     } catch (error) {
-      console.error("Appwrite service :: createPainting :: error", error);
+//       console.error("Appwrite service :: createPainting :: error", error);
       throw error;
     }
   }
@@ -100,7 +100,7 @@ export class Service {
         data,
       );
     } catch (error) {
-      console.error("Appwrite service :: updatePainting :: error", error);
+//       console.error("Appwrite service :: updatePainting :: error", error);
       throw error;
     }
   }
@@ -114,7 +114,7 @@ export class Service {
         { like: newCount },
       );
     } catch (error) {
-      console.warn("Appwrite service :: updateLikeCount :: warning", error);
+//       console.warn("Appwrite service :: updateLikeCount :: warning", error);
       return null;
     }
   }
@@ -136,8 +136,12 @@ export class Service {
       );
       return JSON.parse(execution.responseBody);
     } catch (error) {
-      console.error("Appwrite service :: verifyPayment :: error", error);
-      throw error;
+//       console.error("Appwrite service :: verifyPayment :: error", error);
+      return {
+        success: false,
+        error: true,
+        message: error?.message || "Payment verification request failed.",
+      };
     }
   }
 
@@ -151,20 +155,22 @@ export class Service {
         data,
       );
     } catch (error) {
-      console.error("Appwrite service :: updateOrder :: error", error);
+//       console.error("Appwrite service :: updateOrder :: error", error);
       throw error;
     }
   }
 
-  // 3. Frontend COD Logic (Direct DB Operations)
+  // 3. Frontend Order Logic (Direct DB Operations)
   // ✅ UPDATED: Matching the 'shippingAddress' key from your Checkout component
   async createCODOrder({
     userId,
     items,
     customerName,
     email,
-    shippingAddress, // Changed from shippingDetails
+    shippingAddress,
     totalAmount,
+    paymentMethod = "COD",
+    paymentId = null,
   }) {
     try {
       const paintingIds = Array.isArray(items) ? items : [items];
@@ -189,6 +195,9 @@ export class Service {
         );
       }
 
+      const normalizedPaymentId = paymentId || `${paymentMethod}-${Date.now()}`;
+      const status = paymentMethod === "COD" ? "COD" : paymentMethod;
+
       // C. Create Order Document
       return await this.databases.createDocument(
         conf.appwriteDatabaseId,
@@ -198,17 +207,17 @@ export class Service {
           userId,
           paintingId: paintingIds.join(","),
           amount: parseFloat(totalAmount) || 0,
-          paymentId: `COD-${Date.now()}`,
-          status: "COD",
+          paymentId: normalizedPaymentId,
+          status,
           customerName,
           email,
-          shippingAddress: shippingAddress, // ✅ Now saves the formatted string correctly
-          ordercomplete: "no",
+          shippingAddress: shippingAddress,
+          ordercomplete: paymentMethod === "COD" ? "no" : "pending",
           currency: "INR",
         },
       );
     } catch (error) {
-      console.error("Appwrite service :: createCODOrder :: error", error);
+//       console.error("Appwrite service :: createCODOrder :: error", error);
       throw error;
     }
   }
@@ -226,7 +235,7 @@ export class Service {
         queries,
       );
     } catch (error) {
-      console.error("Appwrite service :: getOrders :: error", error);
+//       console.error("Appwrite service :: getOrders :: error", error);
       return { documents: [], total: 0 };
     }
   }
@@ -263,17 +272,34 @@ export class Service {
 
       return response.data;
     } catch (error) {
-      console.error("Appwrite service :: createPhonePeOrder :: error", error);
+//       console.error("Appwrite service :: createPhonePeOrder :: error", error);
       throw error;
     }
   }
 
   // 2. PayPal Verification (Capture Payment)
-  async verifyPayPalPayment(orderID) {
+  async verifyPayment({
+    orderID,
+    userId,
+    items,
+    shippingAddress,
+    customerName,
+    email,
+    totalPaid,
+    currency,
+    paymentMethod
+  }) {
     try {
       const payload = {
-        orderID,
         paymentMethod: "PayPal",
+        orderID,
+        userId,
+        items,
+        shippingDetails: shippingAddress,
+        customerName,
+        email,
+        totalPaid,
+        currency
       };
 
       const execution = await this.functions.createExecution(
@@ -293,7 +319,7 @@ export class Service {
 
       return response;
     } catch (error) {
-      console.error("Appwrite service :: verifyPayPalPayment :: error", error);
+//       console.error("Appwrite service :: verifyPayment :: error", error);
       throw error;
     }
   }
@@ -319,7 +345,7 @@ export class Service {
       }
       return [];
     } catch (error) {
-      console.log("Appwrite service :: getCart :: error", error);
+//       console.log("Appwrite service :: getCart :: error", error);
       return [];
     }
   }
@@ -362,7 +388,7 @@ export class Service {
         );
       }
     } catch (error) {
-      console.log("Appwrite service :: saveCart :: error", error);
+//       console.log("Appwrite service :: saveCart :: error", error);
       throw error; // Throwing so the UI can handle the error state
     }
   }
@@ -379,7 +405,7 @@ export class Service {
         file,
       );
     } catch (error) {
-      console.error("Appwrite service :: uploadFile :: error", error);
+//       console.error("Appwrite service :: uploadFile :: error", error);
       throw error;
     }
   }
@@ -414,7 +440,7 @@ export class Service {
     } catch (error) {
       // If document doesn't exist (404), return null instead of throwing error
       if (error.code === 404) return null;
-      console.error("Appwrite service :: getUserProfile :: error", error);
+//       console.error("Appwrite service :: getUserProfile :: error", error);
       return null;
     }
   }
@@ -430,7 +456,7 @@ export class Service {
         updateData,
       );
     } catch (error) {
-      console.error("Appwrite service :: updateUserProfile :: error", error);
+//       console.error("Appwrite service :: updateUserProfile :: error", error);
       throw error;
     }
   }

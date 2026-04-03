@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { PayPalButtons, PayPalScriptProvider } from "@paypal/react-paypal-js";
@@ -26,6 +26,7 @@ const Checkout = () => {
     const [processing, setProcessing] = useState(false);
     const [checkingStock, setCheckingStock] = useState(true);
     const [useSavedAddress, setUseSavedAddress] = useState(false);
+    const [validationErrors, setValidationErrors] = useState({});
 
     // 🔘 CURRENCY STATE
     const [selectedCurrency, setSelectedCurrency] = useState("USD");
@@ -34,6 +35,18 @@ const Checkout = () => {
     const [shippingInfo, setShippingInfo] = useState({
         firstName: '', lastName: '', address: '', country: '', state: '', city: '', phone: '', email: '', zipCode: ''
     });
+
+    const indianPaymentOptions = useMemo(() => {
+        return conf.indianPaymentMethods
+            .split(',')
+            .map((method) => method.trim())
+            .filter(Boolean);
+    }, []);
+
+    const primaryIndianPaymentMethod = indianPaymentOptions[0] || 'UPI';
+    const indianUpiId = conf.indianPaymentUpiId;
+    const indianPaymentInstruction = conf.indianPaymentInstruction;
+    const indianUpiLink = indianUpiId ? `upi://pay?pa=${encodeURIComponent(indianUpiId)}&pn=${encodeURIComponent('Adhunic Art')}&cu=INR` : '';
 
     // --- 🔄 LIVE STOCK CHECK ---
     const verifyStock = useCallback(async () => {
@@ -48,7 +61,7 @@ const Checkout = () => {
                 dispatch(syncCartAvailability(response.documents));
             }
         } catch (error) {
-            console.error("Stock check failed:", error);
+//             console.error("Stock check failed:", error);
         } finally {
             setCheckingStock(false);
         }
@@ -118,7 +131,9 @@ const Checkout = () => {
                         country: userCountry
                     }));
                 }
-            } catch (error) { console.error(error); }
+            } catch (error) {
+                console.error(error);
+            }
         };
         checkAuth();
     }, [navigate]);
@@ -192,6 +207,12 @@ const Checkout = () => {
 
     // A. COD Handler
     const handleCODOrder = async () => {
+        // ✅ VALIDATE FORM BEFORE PROCESSING
+        if (!validateCheckoutForm()) {
+            alert("Please fill in all required fields correctly.");
+            return;
+        }
+
         setProcessing(true);
         try {
             await service.createCODOrder({
@@ -212,8 +233,42 @@ const Checkout = () => {
         }
     };
 
+    // ✅ FORM VALIDATION FUNCTION
+    const validateCheckoutForm = () => {
+        const { firstName, lastName, email, phone, address, city, state, zipCode, country } = shippingInfo;
+        const errors = {};
+        
+        // Check if all fields are filled
+        if (!firstName?.trim()) errors.firstName = "First name is required";
+        if (!lastName?.trim()) errors.lastName = "Last name is required";
+        if (!email?.trim()) errors.email = "Email is required";
+        if (!phone?.trim()) errors.phone = "Phone number is required";
+        if (!address?.trim()) errors.address = "Address is required";
+        if (!city?.trim()) errors.city = "City is required";
+        if (!state?.trim()) errors.state = "State is required";
+        if (!zipCode?.trim()) errors.zipCode = "Zip code is required";
+        if (!country?.trim()) errors.country = "Country is required";
+        
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (email && !emailRegex.test(email)) errors.email = "Please enter a valid email";
+        
+        // Phone validation (basic - at least 10 digits)
+        const phoneRegex = /^\d{10,}$/;
+        if (phone && !phoneRegex.test(phone.replace(/\D/g, ''))) errors.phone = "Phone number must be at least 10 digits";
+        
+        setValidationErrors(errors);
+        return Object.keys(errors).length === 0; // Return true if no errors
+    };
+
     // B. PayPal Handler
     const handlePayPalApprove = async (data, actions) => {
+        // ✅ VALIDATE FORM BEFORE PROCESSING
+        if (!validateCheckoutForm()) {
+            alert("Please fill in all required fields correctly.");
+            return;
+        }
+
         setProcessing(true);
         try {
             const orderID = data.orderID;
@@ -222,7 +277,7 @@ const Checkout = () => {
                 orderID: orderID,
                 userId: user.$id,
                 items: availableItems.map(item => item.$id),
-                shippingAddress: formatShippingAddress(), // ✅ Formatted String
+                shippingAddress: formatShippingAddress(),
                 customerName: `${shippingInfo.firstName} ${shippingInfo.lastName}`,
                 email: shippingInfo.email,
                 totalPaid: finalTotal.toFixed(2),
@@ -230,23 +285,70 @@ const Checkout = () => {
                 paymentMethod: "PayPal"
             });
 
-            if (result.success) {
-                dispatch(clearCart());
-                navigate('/orders', { state: { orderId: result.orderId } });
-            } else {
-                throw new Error(result.message || "Payment verification failed.");
+            const errorMessage = result?.message || result?.error || 'Payment verification failed. Please retry.';
+
+            if (!result || result.success !== true) {
+                throw new Error(errorMessage);
             }
+
+            dispatch(clearCart());
+            navigate('/orders', { state: { orderId: result.orderId } });
+            alert('Payment successful! Your order is confirmed.');
         } catch (error) {
-            console.error("Payment Error:", error);
-            alert(`Payment Error: ${error.message}`);
+//             console.error('Payment Error:', error);
+            alert(`Payment Error: ${error?.message || 'Unable to verify the transaction. Please try again.'}`);
             await verifyStock();
         } finally {
             setProcessing(false);
         }
     };
 
-    const handleIndianGatewayPay = () => {
-        alert("Integrate Razorpay or PhonePe SDK here. For now, please use Cash on Delivery.");
+    const handleIndianGatewayPay = async () => {
+        // ✅ VALIDATE FORM BEFORE PROCESSING
+        if (!validateCheckoutForm()) {
+            alert("Please fill in all required fields correctly.");
+            return;
+        }
+
+        if (!indianUpiId) {
+            alert("Configure VITE_INDIAN_PAYMENT_UPI_ID in your .env file before using UPI payment.");
+            return;
+        }
+
+        setProcessing(true);
+        try {
+            await service.createCODOrder({
+                userId: user.$id,
+                items: availableItems.map(item => item.$id),
+                customerName: `${shippingInfo.firstName} ${shippingInfo.lastName}`,
+                email: shippingInfo.email,
+                shippingAddress: formatShippingAddress(),
+                totalAmount: finalTotal,
+                paymentMethod: primaryIndianPaymentMethod,
+                paymentId: `${primaryIndianPaymentMethod}-${Date.now()}`
+            });
+
+            dispatch(clearCart());
+            navigate('/orders');
+            alert(`Order created. Please complete payment using UPI ID ${indianUpiId}.`);
+        } catch (error) {
+//             console.error('UPI Payment Error:', error);
+            alert(`UPI Payment failed: ${error?.message || 'Please try again.'}`);
+            await verifyStock();
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleCopyUpiId = async () => {
+        if (!indianUpiId) return;
+        try {
+            await navigator.clipboard.writeText(indianUpiId);
+            alert('UPI ID copied to clipboard');
+        } catch (copyError) {
+//             console.warn('Copy failed', copyError);
+            alert('Copy failed. Please copy the UPI ID manually.');
+        }
     };
 
     if (cartItems.length === 0) return <div className="h-screen flex flex-col items-center justify-center"><ShoppingBag className="h-16 w-16 text-gray-300 mb-4" /><h2 className="text-2xl font-serif">Empty Cart</h2><button onClick={() => navigate('/shop')} className="mt-4 underline">Go Shopping</button></div>;
@@ -335,22 +437,146 @@ const Checkout = () => {
                         <form className="space-y-6">
                             {/* --- MODIFIED SECTION START --- */}
                             <div className="grid grid-cols-2 gap-4">
-                                <input type="text" placeholder="First Name" className="w-full border p-3 rounded-sm" value={shippingInfo.firstName} onChange={(e) => setShippingInfo({ ...shippingInfo, firstName: e.target.value })} />
-                                <input type="text" placeholder="Last Name" className="w-full border p-3 rounded-sm" value={shippingInfo.lastName} onChange={(e) => setShippingInfo({ ...shippingInfo, lastName: e.target.value })} />
+                                <div>
+                                    <input 
+                                        type="text" 
+                                        placeholder="First Name" 
+                                        className={`w-full border p-3 rounded-sm ${validationErrors.firstName ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                        value={shippingInfo.firstName} 
+                                        onChange={(e) => {
+                                            setShippingInfo({ ...shippingInfo, firstName: e.target.value });
+                                            if (validationErrors.firstName) {
+                                                setValidationErrors({ ...validationErrors, firstName: '' });
+                                            }
+                                        }} 
+                                    />
+                                    {validationErrors.firstName && <p className="text-red-500 text-xs mt-1">{validationErrors.firstName}</p>}
+                                </div>
+                                <div>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Last Name" 
+                                        className={`w-full border p-3 rounded-sm ${validationErrors.lastName ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                        value={shippingInfo.lastName} 
+                                        onChange={(e) => {
+                                            setShippingInfo({ ...shippingInfo, lastName: e.target.value });
+                                            if (validationErrors.lastName) {
+                                                setValidationErrors({ ...validationErrors, lastName: '' });
+                                            }
+                                        }} 
+                                    />
+                                    {validationErrors.lastName && <p className="text-red-500 text-xs mt-1">{validationErrors.lastName}</p>}
+                                </div>
                             </div>
-                            <select className="w-full border p-3 rounded-sm bg-white" value={shippingInfo.country} onChange={handleCountryChange}>
-                                <option value="" disabled>Select Country</option>
-                                {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                            <input type="text" placeholder="Use Local Address Like ( vilage or land mark )" className="w-full border p-3 rounded-sm" value={shippingInfo.address} onChange={(e) => setShippingInfo({ ...shippingInfo, address: e.target.value })} />
+                            <div>
+                                <select 
+                                    className={`w-full border p-3 rounded-sm bg-white ${validationErrors.country ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                    value={shippingInfo.country} 
+                                    onChange={(e) => {
+                                        handleCountryChange(e);
+                                        if (validationErrors.country) {
+                                            setValidationErrors({ ...validationErrors, country: '' });
+                                        }
+                                    }}
+                                >
+                                    <option value="" disabled>Select Country</option>
+                                    {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                                {validationErrors.country && <p className="text-red-500 text-xs mt-1">{validationErrors.country}</p>}
+                            </div>
+                            <div>
+                                <input 
+                                    type="text" 
+                                    placeholder="Use Local Address Like ( vilage or land mark )" 
+                                    className={`w-full border p-3 rounded-sm ${validationErrors.address ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                    value={shippingInfo.address} 
+                                    onChange={(e) => {
+                                        setShippingInfo({ ...shippingInfo, address: e.target.value });
+                                        if (validationErrors.address) {
+                                            setValidationErrors({ ...validationErrors, address: '' });
+                                        }
+                                    }} 
+                                />
+                                {validationErrors.address && <p className="text-red-500 text-xs mt-1">{validationErrors.address}</p>}
+                            </div>
                             <div className="grid grid-cols-3 gap-4">
-                                <input type="text" placeholder="City" className="w-full border p-3 rounded-sm" value={shippingInfo.city} onChange={(e) => setShippingInfo({ ...shippingInfo, city: e.target.value })} />
-                                <input type="text" placeholder="State" className="w-full border p-3 rounded-sm" value={shippingInfo.state} onChange={(e) => setShippingInfo({ ...shippingInfo, state: e.target.value })} />
-                                <input type="text" placeholder="Zip Code" className="w-full border p-3 rounded-sm" value={shippingInfo.zipCode} onChange={(e) => setShippingInfo({ ...shippingInfo, zipCode: e.target.value })} />
+                                <div>
+                                    <input 
+                                        type="text" 
+                                        placeholder="City" 
+                                        className={`w-full border p-3 rounded-sm ${validationErrors.city ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                        value={shippingInfo.city} 
+                                        onChange={(e) => {
+                                            setShippingInfo({ ...shippingInfo, city: e.target.value });
+                                            if (validationErrors.city) {
+                                                setValidationErrors({ ...validationErrors, city: '' });
+                                            }
+                                        }} 
+                                    />
+                                    {validationErrors.city && <p className="text-red-500 text-xs mt-1">{validationErrors.city}</p>}
+                                </div>
+                                <div>
+                                    <input 
+                                        type="text" 
+                                        placeholder="State" 
+                                        className={`w-full border p-3 rounded-sm ${validationErrors.state ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                        value={shippingInfo.state} 
+                                        onChange={(e) => {
+                                            setShippingInfo({ ...shippingInfo, state: e.target.value });
+                                            if (validationErrors.state) {
+                                                setValidationErrors({ ...validationErrors, state: '' });
+                                            }
+                                        }} 
+                                    />
+                                    {validationErrors.state && <p className="text-red-500 text-xs mt-1">{validationErrors.state}</p>}
+                                </div>
+                                <div>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Zip Code" 
+                                        className={`w-full border p-3 rounded-sm ${validationErrors.zipCode ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                        value={shippingInfo.zipCode} 
+                                        onChange={(e) => {
+                                            setShippingInfo({ ...shippingInfo, zipCode: e.target.value });
+                                            if (validationErrors.zipCode) {
+                                                setValidationErrors({ ...validationErrors, zipCode: '' });
+                                            }
+                                        }} 
+                                    />
+                                    {validationErrors.zipCode && <p className="text-red-500 text-xs mt-1">{validationErrors.zipCode}</p>}
+                                </div>
                             </div>
                             <div className="space-y-4">
-                                <input type="tel" placeholder="Phone" className="w-full border p-3 rounded-sm" value={shippingInfo.phone} onChange={(e) => setShippingInfo({ ...shippingInfo, phone: e.target.value })} />
-                                <input type="email" placeholder="Email" className="w-full border p-3 rounded-sm" value={shippingInfo.email} onChange={(e) => setShippingInfo({ ...shippingInfo, email: e.target.value })} />
+                                <div>
+                                    <input 
+                                        type="tel" 
+                                        placeholder="Phone" 
+                                        className={`w-full border p-3 rounded-sm ${validationErrors.phone ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                        value={shippingInfo.phone} 
+                                        onChange={(e) => {
+                                            setShippingInfo({ ...shippingInfo, phone: e.target.value });
+                                            if (validationErrors.phone) {
+                                                setValidationErrors({ ...validationErrors, phone: '' });
+                                            }
+                                        }} 
+                                    />
+                                    {validationErrors.phone && <p className="text-red-500 text-xs mt-1">{validationErrors.phone}</p>}
+                                </div>
+                                <div>
+                                    <input 
+                                        type="email" 
+                                        placeholder="Email" 
+                                        className={`w-full border p-3 rounded-sm ${validationErrors.email ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
+                                        value={shippingInfo.email} 
+                                        onChange={(e) => {
+                                            setShippingInfo({ ...shippingInfo, email: e.target.value });
+                                            if (validationErrors.email) {
+                                                setValidationErrors({ ...validationErrors, email: '' });
+                                            }
+                                        }} 
+                                    />
+                                    {validationErrors.email && <p className="text-red-500 text-xs mt-1">{validationErrors.email}</p>}
+                                </div>
                             </div>
                             {/* --- MODIFIED SECTION END --- */}
 
@@ -361,15 +587,63 @@ const Checkout = () => {
                                 ) : (
                                     <div className="space-y-4">
                                         {selectedCurrency === "INR" && (
-                                            <div className="space-y-3">
-                                                <button type="button" onClick={handleIndianGatewayPay} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-sm flex items-center justify-center gap-2 transition-colors"><Smartphone size={20} /> Pay via PhonePe / UPI / Card</button>
-                                                <p className="text-xs text-center text-gray-400">- OR -</p>
-                                                <button type="button" onClick={handleCODOrder} disabled={processing} className="w-full bg-[#FFC439] hover:bg-[#F4BB2E] text-charcoal font-bold py-3 rounded-sm flex items-center justify-center gap-2 transition-colors">{processing ? <Loader2 className="animate-spin" /> : <><Truck size={20} /> Cash on Delivery</>}</button>
+                                            <div className="space-y-4">
+                                                {indianUpiId ? (
+                                                    <div className="p-4 bg-slate-50 rounded-sm text-sm text-slate-700">
+                                                        <p className="font-semibold">Pay using UPI</p>
+                                                        <p className="mt-3 text-lg tracking-wide">{indianUpiId}</p>
+                                                        <p className="mt-2 text-xs text-gray-500">{indianPaymentInstruction}</p>
+                                                        <p className="mt-2 text-xs text-gray-500">Scan or pay direct to the client using any UPI app.</p>
+                                                        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleCopyUpiId}
+                                                                className="flex-1 bg-charcoal hover:bg-black text-white font-bold py-3 rounded-sm transition-colors"
+                                                            >
+                                                                Copy UPI ID
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { if (indianUpiLink) window.open(indianUpiLink, '_blank'); }}
+                                                                disabled={!indianUpiLink}
+                                                                className="flex-1 bg-white border border-gray-300 text-gray-700 font-bold py-3 rounded-sm transition-colors hover:bg-gray-100 disabled:bg-gray-200 disabled:text-gray-500"
+                                                            >
+                                                                Open UPI App
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="p-4 bg-yellow-50 rounded-sm text-sm text-yellow-900 border border-yellow-200">
+                                                        Configure <code>VITE_INDIAN_PAYMENT_UPI_ID</code> in your .env to enable UPI checkout.
+                                                    </div>
+                                                )}
+
+                                                <div className="grid gap-3">
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleIndianGatewayPay}
+                                                        disabled={processing || !indianUpiId}
+                                                        className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:text-gray-500 text-white font-bold py-3 rounded-sm transition-colors"
+                                                    >
+                                                        {processing ? <Loader2 className="animate-spin" /> : `Pay using ${primaryIndianPaymentMethod}`}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleCODOrder}
+                                                        disabled={processing}
+                                                        className="w-full bg-white border border-gray-300 text-charcoal font-bold py-3 rounded-sm hover:bg-gray-50 transition-colors"
+                                                    >
+                                                        {processing ? <Loader2 className="animate-spin" /> : 'Cash on Delivery (COD)'}
+                                                    </button>
+                                                </div>
+
+                                                <p className="text-center text-xs text-gray-500">Change gateway name or UPI ID in <code>.env</code> and restart the app.</p>
                                             </div>
                                         )}
                                         {selectedCurrency === "USD" && (
                                             <div className="relative z-0">
                                                 <p className="text-xs text-gray-500 mb-2 text-center">Secure payment via PayPal (Credit/Debit Cards)</p>
+                                                {console.log('Using PayPal Client ID for live payments:', conf.appwritePaypalClientId)}
                                                 <PayPalScriptProvider options={{ "client-id": conf.appwritePaypalClientId, currency: "USD", intent: "capture" }} key="paypal-usd">
                                                     <PayPalButtons
                                                         style={{ layout: "vertical", height: 48 }}
@@ -382,7 +656,7 @@ const Checkout = () => {
                                                             });
                                                         }}
                                                         onApprove={handlePayPalApprove}
-                                                        onError={(err) => { console.error(err); alert("PayPal transaction failed. Please try again."); }}
+//                                                         onError={(err) => { console.error(err); alert("PayPal transaction failed. Please try again."); }}
                                                     />
                                                 </PayPalScriptProvider>
                                             </div>

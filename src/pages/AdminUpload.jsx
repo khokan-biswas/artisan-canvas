@@ -148,7 +148,7 @@ const AdminUpload = () => {
             }
             navigate('/admin/products');
         } catch (err) {
-            console.error("Full Error:", err);
+//             console.error("Full Error:", err);
             setError(err.message || "Failed to save product.");
         } finally {
             setLoading(false);
@@ -158,14 +158,14 @@ const AdminUpload = () => {
     return (
         <div className="min-h-screen bg-[#F9F7F2] flex font-serif text-charcoal">
             <aside className="w-64 bg-white border-r border-[#EBE7DE] fixed h-full hidden md:flex flex-col z-20">
-                <div className="p-8"><h1 className="text-2xl font-bold text-charcoal">Artisan Canvas</h1></div>
+                <div className="p-8"><h1 className="text-2xl font-bold text-charcoal">Adhunic Art</h1></div>
                 <nav className="flex-1 px-4 space-y-2">
                     <SidebarItem icon={LayoutDashboard} label="Dashboard" to="/admin" />
                     <SidebarItem icon={Package} label="Products" to="/admin/products" />
                     <SidebarItem icon={ShoppingCart} label="Orders" to="/admin/orders" />
                     <SidebarItem icon={Users} label="Customers" to="/admin/customers" />
                     <SidebarItem icon={Palette} label="Upload" active={true} to="/admin/upload" />
-                    <SidebarItem icon={Settings} label="Settings" />
+                    <SidebarItem icon={Settings} label="Settings" to="/admin/settings" />
                 </nav>
             </aside>
 

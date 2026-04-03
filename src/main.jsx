@@ -23,15 +23,16 @@ const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard.jsx'));
 const AdminProducts = React.lazy(() => import('./pages/AdminProducts.jsx'));
 const AdminOrders = React.lazy(() => import('./pages/AdminOders.jsx'));
 const AdminCustomers = React.lazy(() => import('./pages/AdminCustomers.jsx'));
+const AdminSettings = React.lazy(() => import('./pages/AdminSettings.jsx'));
 const Orders = React.lazy(() => import('./pages/Oders.jsx'));
 
 
 const About = () => (
   <div className="min-h-screen bg-[#FDFBF7] px-4 py-12">
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-4xl font-serif text-charcoal mb-6">About Artisan Canvas</h1>
+      <h1 className="text-4xl font-serif text-charcoal mb-6">About Adhunic Art</h1>
       <p className="text-gray-600 text-lg leading-relaxed mb-4">
-        Welcome to Artisan Canvas, your destination for curated fine art and contemporary paintings.
+        Welcome to Adhunic Art, your destination for curated fine art and contemporary paintings.
       </p>
       <p className="text-gray-600 text-lg leading-relaxed">
         We believe in supporting artists and bringing exceptional artwork into homes and spaces worldwide.
@@ -93,6 +94,7 @@ const router = createBrowserRouter([
       { path: "/admin/products", element: <AuthLayout authentication={true} adminOnly={true}><Suspense fallback={<PageLoader />}><AdminProducts /></Suspense></AuthLayout> },
       { path: "/admin/orders", element: <AuthLayout authentication={true} adminOnly={true}><Suspense fallback={<PageLoader />}><AdminOrders /></Suspense></AuthLayout> },
       { path: "/admin/customers", element: <AuthLayout authentication={true} adminOnly={true}><Suspense fallback={<PageLoader />}><AdminCustomers /></Suspense></AuthLayout> },
+      { path: "/admin/settings", element: <AuthLayout authentication={true} adminOnly={true}><Suspense fallback={<PageLoader />}><AdminSettings /></Suspense></AuthLayout> },
     ],
   },
 ]);

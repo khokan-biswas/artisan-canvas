@@ -26,15 +26,15 @@ export const fetchCategoryPaintings = createAsyncThunk(
             // Query.orderDesc('$createdAt') 
         ];
 
-        console.log(`Fetching ${category}...`); // 🔍 Debug Log
+//         console.log(`Fetching ${category}...`); // 🔍 Debug Log
         
         const data = await service.getPaintings(queries);
         
-        console.log(`Fetched ${category}:`, data.documents.length, "items"); // 🔍 Debug Log
+//         console.log(`Fetched ${category}:`, data.documents.length, "items"); // 🔍 Debug Log
         
         return { category, documents: data.documents, total: data.total };
     } catch (err) {
-      console.error(`Error in fetchCategoryPaintings (${category}):`, err);
+//       console.error(`Error in fetchCategoryPaintings (${category}):`, err);
       return rejectWithValue(err.message);
     }
   }
@@ -72,7 +72,7 @@ export const fetchFilteredPaintings = createAsyncThunk(
       return { documents: response.documents, total: response.total };
 
     } catch (err) {
-      console.error("Shop API Error:", err);
+//       console.error("Shop API Error:", err);
       return rejectWithValue(err.message);
     }
   }

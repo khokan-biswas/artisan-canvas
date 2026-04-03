@@ -182,10 +182,10 @@ export const logPerformanceMetrics = () => {
   const metrics = collectMetrics();
   if (metrics) {
     console.group('📊 Performance Metrics');
-    console.log('Page Load Time:', metrics.pageLoadTime);
-    console.log('Connect Time:', metrics.connectTime);
-    console.log('Render Time:', metrics.renderTime);
-    console.log('Total Resources:', metrics.resourceCount);
+//     console.log('Page Load Time:', metrics.pageLoadTime);
+//     console.log('Connect Time:', metrics.connectTime);
+//     console.log('Render Time:', metrics.renderTime);
+//     console.log('Total Resources:', metrics.resourceCount);
     console.groupEnd();
   }
 };

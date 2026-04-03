@@ -11,7 +11,7 @@ const Footer = () => {
           {/* Column 1: Brand & About */}
           <div className="space-y-4">
             <h2 className="text-2xl font-serif font-bold text-white tracking-tight">
-              Artisan<span className="text-yellow-500">Canvas</span>
+              Adhunic<span className="text-yellow-500"> Art</span>
             </h2>
             <p className="text-sm leading-relaxed">
               Curating unique, one-of-a-kind paintings from independent artists. 
@@ -70,7 +70,7 @@ const Footer = () => {
 
         {/* Bottom Copyright Bar */}
         <div className="border-t border-gray-800 mt-12 pt-8 text-center text-xs text-gray-500">
-          <p>&copy; {new Date().getFullYear()} Artisan Canvas. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Adhunic Art. All rights reserved.</p>
         </div>
       </div>
     </footer>

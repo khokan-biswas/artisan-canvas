@@ -8,8 +8,8 @@ import { Loader2, ChevronDown, ChevronUp, ChevronRight, SearchX, XCircle } from 
 import ProductCard from '../components/ProductCard.jsx';
 
 // --- Helper Component: Collapsible Filter Section ---
-const FilterSection = ({ title, children }) => {
-    const [isOpen, setIsOpen] = useState(true);
+const FilterSection = ({ title, children, defaultOpen = false }) => {
+    const [isOpen, setIsOpen] = useState(Boolean(defaultOpen));
     return (
         <div className="border-b border-gray-200 py-4">
             <button
@@ -26,14 +26,14 @@ const FilterSection = ({ title, children }) => {
 
 // --- Helper Component: Single Checkbox Option ---
 const FilterCheckbox = ({ label, value, checked, onChange }) => (
-    <label className="flex items-center space-x-3 cursor-pointer group">
+    <label className="flex items-center space-x-2 cursor-pointer group text-xs">
         <input
             type="checkbox"
             className="h-4 w-4 rounded border-gray-300 text-charcoal focus:ring-charcoal transition"
             checked={checked}
             onChange={() => onChange(value)}
         />
-        <span className="text-sm text-gray-600 group-hover:text-charcoal transition">{label}</span>
+        <span className="text-xs text-gray-600 group-hover:text-charcoal transition">{label}</span>
     </label>
 );
 
@@ -68,7 +68,7 @@ const Shop = () => {
                     setUserCountry(user.country);
                 }
             } catch (error) {
-                console.log("Guest User - defaulting to USD");
+//                 console.log("Guest User - defaulting to USD");
             }
         };
         getUserContext();
@@ -146,6 +146,104 @@ const Shop = () => {
                 </div>
 
                 <h1 className="text-4xl font-serif font-bold mb-10">Shop All</h1>
+
+                {/* Mobile Filters - keep all filters visible for phone users */}
+                <div className="lg:hidden bg-white rounded-3xl shadow-sm p-5 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 className="text-lg font-semibold text-charcoal">Filters</h2>
+                            <p className="text-xs text-gray-500">Choose your art preferences</p>
+                        </div>
+                        <button onClick={handleClearFilters} className="text-xs font-semibold uppercase tracking-wider text-charcoal hover:text-black">
+                            Clear
+                        </button>
+                    </div>
+
+                    <FilterSection title="Medium">
+                        {['Oil', 'Acrylic', 'Watercolor'].map((item) => (
+                            <FilterCheckbox
+                                key={item}
+                                label={item}
+                                value={item}
+                                checked={filters.medium.includes(item)}
+                                onChange={(val) => handleCheckboxChange('medium', val)}
+                            />
+                        ))}
+                    </FilterSection>
+
+                    <FilterSection title="CATEGORIES">
+                        {[
+                            'Landscape',
+                            'Portrait',
+                            'Abstract',
+                            'Still Life',
+                            'Spiritual',
+                            'Contemporary',
+                            'Wildlife',
+                            'Seascape',
+                            'Urban',
+                            'Figurative',
+                            'Minimalist',
+                            'Surrealism',
+                            'Mythological',
+                            'Tribal',
+                            'Calligraphy',
+                            'Botanical'
+                        ].map((item) => (
+                            <FilterCheckbox
+                                key={item}
+                                label={item}
+                                value={item}
+                                checked={filters.subject.includes(item)}
+                                onChange={(val) => handleCheckboxChange('subject', val)}
+                            />
+                        ))}
+                    </FilterSection>
+
+                    <FilterSection title="Style">
+                        {['Modern', 'Traditional', 'Impressionist'].map((item) => (
+                            <FilterCheckbox
+                                key={item}
+                                label={item}
+                                value={item}
+                                checked={filters.style.includes(item)}
+                                onChange={(val) => handleCheckboxChange('style', val)}
+                            />
+                        ))}
+                    </FilterSection>
+
+                    <FilterSection title="Price">
+                        <div className="flex items-center space-x-3 mb-3">
+                            <div className="relative w-full">
+                                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">$</span>
+                                <input
+                                    type="number"
+                                    className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-sm text-sm focus:border-charcoal focus:ring-0 outline-none bg-white"
+                                    placeholder="Min"
+                                    value={priceInputs.min}
+                                    onChange={(e) => setPriceInputs({ ...priceInputs, min: e.target.value })}
+                                />
+                            </div>
+                            <span className="text-gray-500">-</span>
+                            <div className="relative w-full">
+                                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">$</span>
+                                <input
+                                    type="number"
+                                    className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-sm text-sm focus:border-charcoal focus:ring-0 outline-none bg-white"
+                                    placeholder="Max"
+                                    value={priceInputs.max}
+                                    onChange={(e) => setPriceInputs({ ...priceInputs, max: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                        <button
+                            onClick={handlePriceApply}
+                            className="w-full bg-charcoal text-white py-2 rounded-sm text-sm font-medium hover:bg-gray-800 transition"
+                        >
+                            Apply
+                        </button>
+                    </FilterSection>
+                </div>
 
                 <div className="lg:grid lg:grid-cols-4 lg:gap-x-12">
 

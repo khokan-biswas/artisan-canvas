@@ -35,10 +35,10 @@ export class FunctionService {
             
             // Parse the response from the function
             const response = JSON.parse(execution.responseBody);
-            console.log("PayPal Verification Response:", response);
+//             console.log("PayPal Verification Response:", response);
             return response;
         } catch (error) {
-            console.error("Appwrite service :: verifyPayment :: error", error);
+//             console.error("Appwrite service :: verifyPayment :: error", error);
             throw new Error(error.message || "Payment verification failed");
         }
     }
