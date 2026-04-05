@@ -9,7 +9,10 @@ import { Helmet } from 'react-helmet-async';
 import HeroImage from '../components/HeroImage.jsx';
 
 // ⚠️ Ensure this image exists in your assets folder, or change the path
-import HERO_IMAGE_URL from '../assets/Gemini_Generated_Image_ys2ex3ys2ex3ys2e.png';
+import HERO_IMAGE_URL from '../assets/heroimage.webp';
+
+console.log("khokan",HERO_IMAGE_URL);
+
 
 // 1. Define the categories
 const CATEGORIES = [

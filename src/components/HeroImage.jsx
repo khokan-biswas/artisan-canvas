@@ -3,33 +3,27 @@ import React, { useState } from 'react';
 const HeroImage = ({ src, alt, className }) => {
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Assuming WebP version exists with .webp extension
-  const webpSrc = src.replace(/\.(png|jpg|jpeg)$/i, '.webp');
-  const lowResSrc = src.replace(/\.(png|jpg|jpeg|webp)$/i, '_lowres.jpg'); // Assuming a low-res version exists
-
   return (
-    <div className="relative w-full h-full">
-      {/* Low-res blurred placeholder */}
+    <div className="relative w-full h-full bg-charcoal overflow-hidden">
+      {/* 1. Placeholder: A simple shimmer effect while the big image downloads */}
       {!isLoaded && (
-        <img
-          src={lowResSrc}
-          alt={alt}
-          className={`${className} blur-sm scale-110`}
-          style={{ filter: 'blur(10px)' }}
-        />
+        <div className="absolute inset-0 bg-slate-800 animate-pulse z-10" />
       )}
-      {/* High-res image */}
-      <picture className={className}>
-        <source srcSet={webpSrc} type="image/webp" />
-        <img
-          src={src}
-          alt={alt}
-          fetchpriority="high"
-          loading="eager"
-          className={`${className} ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}
-          onLoad={() => setIsLoaded(true)}
-        />
-      </picture>
+
+      {/* 2. High-res image */}
+      <img
+        src={src}
+        alt={alt}
+        // ✅ Fixed: React requires camelCase 'fetchPriority'
+        fetchPriority="high" 
+        loading="eager"
+        onLoad={() => setIsLoaded(true)}
+        className={`${className} transition-opacity duration-1000 ease-in-out ${
+          isLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
+        // Log error if path is broken
+        onError={() => console.error("HeroImage component failed to load:", src)}
+      />
     </div>
   );
 };

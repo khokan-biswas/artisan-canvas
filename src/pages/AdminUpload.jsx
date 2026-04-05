@@ -97,58 +97,86 @@ const AdminUpload = () => {
     // --- 4. Optimization: Compression Helper ---
     const uploadHelper = async (file) => {
         if (!file) return null;
-        const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1280, useWebWorker: true, fileType: "image/webp" };
+
+        // 💡 SDE Tip: 0.5MB (500KB) is actually quite large for a webp. 
+        // For an art gallery, 0.2MB (200KB) is the "Sweet Spot" for quality vs speed.
+        const options = {
+            maxSizeMB: 0.2, // Reduced from 0.5 for faster loading
+            maxWidthOrHeight: 1440, // Slightly higher for "Retina" screens
+            useWebWorker: true,
+            fileType: "image/webp",
+            initialQuality: 0.8 // 80% quality is indistinguishable from 100%
+        };
+
         try {
             const compressed = await imageCompression(file, options);
-            const response = await service.uploadFile(new File([compressed], file.name, { type: "image/webp" }));
+
+            // Ensure the file name ends with .webp so your OptimizedImage component 
+            // doesn't get confused by a .png extension on a webp file.
+            const fileName = file.name.replace(/\.[^/.]+$/, "") + ".webp";
+            const finalFile = new File([compressed], fileName, { type: "image/webp" });
+
+            const response = await service.uploadFile(finalFile);
             return service.getThumbnail(response.$id);
         } catch (err) {
+            console.error("Compression failed, uploading original:", err);
             const response = await service.uploadFile(file);
             return service.getThumbnail(response.$id);
         }
     };
 
     // --- 5. Submit Logic ---
-    const submitHandler = async (formData) => { // renamed to formData for clarity
+    // --- 5. Submit Logic ---
+    const submitHandler = async (formData) => {
         setLoading(true);
         setError(null);
         try {
             // 1. Separate the raw 'image' file input from the rest of the data
             const { image, ...restOfData } = formData;
 
-            // 2. Process Main Image
+            // 2. Process Main Image using the compression helper
             let mainImageUrl = editModeProduct?.imageUrl || null;
             if (image?.[0]) {
                 mainImageUrl = await uploadHelper(image[0]);
             }
 
-            // 3. Process Gallery (Mapping slots)
-            const galleryPromises = galleryFiles.map(async (file, i) => {
-                if (file) return await uploadHelper(file);
-                return galleryPreviews[i] && galleryPreviews[i].startsWith('http') ? galleryPreviews[i] : null;
-            });
-            const uploadedGallery = (await Promise.all(galleryPromises)).filter(Boolean);
+            // 3. Process Gallery (Ensuring all new files pass through uploadHelper)
+            const uploadedGallery = (await Promise.all(
+                galleryFiles.map(async (file, i) => {
+                    // If there is a new file in this slot, compress and upload it
+                    if (file) return await uploadHelper(file);
 
-            // 4. Construct Payload using 'restOfData' instead of 'formData'
+                    // If no new file, but an existing URL exists (Edit Mode), keep it
+                    return galleryPreviews[i] && galleryPreviews[i].startsWith('http')
+                        ? galleryPreviews[i]
+                        : null;
+                })
+            )).filter(Boolean); // Remove any nulls from empty slots
+
+            // 4. Construct Payload
             const payload = {
-                ...restOfData, // ✅ No 'image' field here anymore
+                ...restOfData,
                 imageUrl: mainImageUrl,
                 gallery: uploadedGallery,
                 pricein: parseFloat(formData.pricein) || 0,
                 priceusd: parseFloat(formData.priceusd) || 0,
                 discountin: parseFloat(formData.discountin) || 0,
                 discountusd: parseFloat(formData.discountusd) || 0,
+                // Ensure boolean types for Appwrite
                 isSold: editModeProduct ? Boolean(editModeProduct.isSold) : false,
+                isFeatured: Boolean(formData.isFeatured),
             };
 
+            // 5. Database Operation
             if (editModeProduct) {
                 await service.updatePainting(editModeProduct.$id, payload);
             } else {
                 await service.createPainting(payload);
             }
+
             navigate('/admin/products');
         } catch (err) {
-//             console.error("Full Error:", err);
+            console.error("Submission Error:", err);
             setError(err.message || "Failed to save product.");
         } finally {
             setLoading(false);
