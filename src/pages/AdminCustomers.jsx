@@ -7,7 +7,6 @@ import {
   ShoppingCart, 
   Users, 
   Palette, 
-  Settings, 
   Search, 
   ChevronDown,
   Download,
@@ -141,7 +140,6 @@ const AdminCustomers = () => {
             <SidebarItem icon={ShoppingCart} label="Orders" to="/admin/orders" />
             <SidebarItem icon={Users} label="Customers" active={true} to="/admin/customers" />
             <SidebarItem icon={Palette} label="Upload" to="/admin/upload" />
-            <SidebarItem icon={Settings} label="Settings" to="/admin/settings" />
         </nav>
       </aside>
 

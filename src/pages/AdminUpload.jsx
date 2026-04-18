@@ -4,7 +4,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import service from '../backend/config';
 import {
     Loader2, UploadCloud, LayoutDashboard, Package, ShoppingCart,
-    Users, Palette, Settings, IndianRupee, X
+    Users, Palette, IndianRupee, X
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 
@@ -193,7 +193,6 @@ const AdminUpload = () => {
                     <SidebarItem icon={ShoppingCart} label="Orders" to="/admin/orders" />
                     <SidebarItem icon={Users} label="Customers" to="/admin/customers" />
                     <SidebarItem icon={Palette} label="Upload" active={true} to="/admin/upload" />
-                    <SidebarItem icon={Settings} label="Settings" to="/admin/settings" />
                 </nav>
             </aside>
 

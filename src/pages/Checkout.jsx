@@ -8,7 +8,7 @@ import service from "../backend/config.js";
 import conf from "../conf/conf.js";
 import { Query } from 'appwrite';
 import OptimizedImage from "../components/OptimizedImage";
-import { Loader2, Trash2, ShoppingBag, ChevronLeft, Truck, Smartphone, CheckSquare, Square } from 'lucide-react';
+import { Loader2, Trash2, ShoppingBag, ChevronLeft, Truck, Smartphone, ShieldCheck, CheckSquare, Square } from 'lucide-react';
 import { COUNTRIES, SHIPPING_RATES_USD, SHIPPING_RATES_INR } from '../constants/countries.js';
 
 // 💱 Exchange Rate
@@ -48,6 +48,25 @@ const Checkout = () => {
     const indianPaymentInstruction = conf.indianPaymentInstruction;
     const indianUpiLink = indianUpiId ? `upi://pay?pa=${encodeURIComponent(indianUpiId)}&pn=${encodeURIComponent('Adhunic Art')}&cu=INR` : '';
 
+    const paypalOptions = useMemo(() => ({
+        "client-id": conf.paypalClientId,
+        currency: "USD",
+        intent: "capture",
+    }), []);
+
+    const handlePayPalButtonClick = (data, actions) => {
+        // 1. Run sync validation immediately (no async, no setTimeout)
+        const { isValid, errors } = validateCheckoutFormSync();
+        
+        if (!isValid) {
+            setValidationErrors(errors);
+            alert("Please complete the shipping form first.");
+            return actions.reject(); // Tells PayPal: "Do not open popup"
+        }
+        
+        return actions.resolve(); // Tells PayPal: "Everything is good, open now"
+    };
+
     // --- 🔄 LIVE STOCK CHECK ---
     const verifyStock = useCallback(async () => {
         if (cartItems.length === 0) {
@@ -61,13 +80,13 @@ const Checkout = () => {
                 dispatch(syncCartAvailability(response.documents));
             }
         } catch (error) {
-//             console.error("Stock check failed:", error);
+            //             console.error("Stock check failed:", error);
         } finally {
             setCheckingStock(false);
         }
     }, [cartItems, dispatch]);
 
-    useEffect(() => { verifyStock(); }, [dispatch]);
+    useEffect(() => { verifyStock(); }, [verifyStock]);
 
     // --- 💰 PRICE CALCULATION LOGIC ---
     const calculateItemFinancials = (item, currency) => {
@@ -113,22 +132,11 @@ const Checkout = () => {
                     const profile = await service.getUserProfile(userData.$id);
                     if (profile) setUserProfile(profile);
 
-                    const userCountry = userData.country || '';
-
-                    if (userCountry === "India") {
-                        setSelectedCurrency("INR");
-                        setShippingCost(SHIPPING_RATES_INR["India"] || 0);
-                    } else if (userCountry) {
-                        setSelectedCurrency("USD");
-                        setShippingCost(SHIPPING_RATES_USD[userCountry] || SHIPPING_RATES_USD["Other"]);
-                    }
-
+                    // Only auto-fill email on first load
+                    // User must manually fill name, address, and country
                     setShippingInfo(prev => ({
                         ...prev,
                         email: userData.email,
-                        firstName: userData.name.split(' ')[0],
-                        lastName: userData.name.split(' ')[1] || '',
-                        country: userCountry
                     }));
                 }
             } catch (error) {
@@ -151,17 +159,25 @@ const Checkout = () => {
 
         if (newVal && userProfile) {
             const savedCountry = userProfile.country || '';
+            
+            // Split name into firstName and lastName
+            const nameParts = (userProfile.name || '').split(' ');
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
 
-            // 1. Fill fields from profile
-            setShippingInfo({
-                ...shippingInfo,
-                address: userProfile.address || '',
-                city: userProfile.city || '',
-                state: userProfile.state || '',
-                zipCode: userProfile.zip || '',
+            // 1. Fill fields from profile using functional setState to avoid stale state
+            setShippingInfo(prev => ({
+                ...prev,
+                firstName: firstName,
+                lastName: lastName,
+                address: userProfile.address || prev.address,
+                city: userProfile.city || prev.city,
+                state: userProfile.state || prev.state,
+                zipCode: userProfile.zip || prev.zipCode,
                 country: savedCountry,
-                phone: userProfile.phone || shippingInfo.phone // Keep current phone if profile is empty
-            });
+                phone: userProfile.phone || prev.phone,
+                email: userProfile.email || prev.email
+            }));
 
             // 2. Update Shipping & Currency
             if (savedCountry === "India") {
@@ -171,22 +187,76 @@ const Checkout = () => {
                 setSelectedCurrency("USD");
                 setShippingCost(SHIPPING_RATES_USD[savedCountry] || SHIPPING_RATES_USD["Other"]);
             }
+            
+            // 3. Clear any validation errors when using saved address
+            setValidationErrors({});
         }
         // Note: We removed the 'else' block that was clearing the fields.
         // This ensures that when you unmark, the data stays there and buttons remain visible.
     };
 
+    // --- ✅ ENSURE VALIDATION USES CURRENT FORM STATE ---
+    const validateCheckoutFormSync = () => {
+        const { firstName, lastName, email, phone, address, city, state, zipCode, country } = shippingInfo;
+        const errors = {};
+
+        // Check if all fields are filled - use trim to remove whitespace
+        const checkField = (value, fieldName, fieldLabel) => {
+            const trimmed = value?.trim() || '';
+            if (!trimmed) {
+                errors[fieldName] = `${fieldLabel} is required`;
+            }
+        };
+
+        checkField(firstName, 'firstName', 'First name');
+        checkField(lastName, 'lastName', 'Last name');
+        checkField(email, 'email', 'Email');
+        checkField(phone, 'phone', 'Phone number');
+        checkField(address, 'address', 'Address');
+        checkField(city, 'city', 'City');
+        checkField(state, 'state', 'State');
+        checkField(zipCode, 'zipCode', 'Zip code');
+        checkField(country, 'country', 'Country');
+
+        // Email validation (only if email is provided)
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (email?.trim() && !emailRegex.test(email)) {
+            errors.email = "Please enter a valid email";
+        }
+
+        // Phone validation (basic - at least 10 digits)
+        const phoneDigits = phone?.replace(/\D/g, '') || '';
+        if (phoneDigits && phoneDigits.length < 10) {
+            errors.phone = "Phone number must be at least 10 digits";
+        }
+
+        return { errors, isValid: Object.keys(errors).length === 0 };
+    };
+
+    // --- UNIFIED FIELD CHANGE HANDLER ---
+    const handleFieldChange = (fieldName, value) => {
+        setShippingInfo(prev => ({ ...prev, [fieldName]: value }));
+        // Clear that field's error when user starts editing
+        if (validationErrors[fieldName]) {
+            setValidationErrors(prev => ({ ...prev, [fieldName]: '' }));
+        }
+    };
+
     // --- HANDLERS ---
     const handleCountryChange = (e) => {
         const country = e.target.value;
+        
+        // Update shipping info first
+        handleFieldChange('country', country);
+        
+        // Then update currency and shipping cost based on country
         if (country === "India") {
             setSelectedCurrency("INR");
             setShippingCost(SHIPPING_RATES_INR["India"] || 0);
-        } else {
+        } else if (country) {
             setSelectedCurrency("USD");
             setShippingCost(SHIPPING_RATES_USD[country] || SHIPPING_RATES_USD["Other"]);
         }
-        setShippingInfo({ ...shippingInfo, country });
     };
 
     const handleCurrencyToggle = (currency) => {
@@ -208,7 +278,9 @@ const Checkout = () => {
     // A. COD Handler
     const handleCODOrder = async () => {
         // ✅ VALIDATE FORM BEFORE PROCESSING
-        if (!validateCheckoutForm()) {
+        const { isValid, errors } = validateCheckoutFormSync();
+        if (!isValid) {
+            setValidationErrors(errors);
             alert("Please fill in all required fields correctly.");
             return;
         }
@@ -223,6 +295,7 @@ const Checkout = () => {
                 shippingAddress: formatShippingAddress(), // ✅ Formatted String
                 totalAmount: finalTotal
             });
+            await updateUserProfileIfNeeded();
             dispatch(clearCart());
             navigate('/orders');
         } catch (error) {
@@ -233,69 +306,71 @@ const Checkout = () => {
         }
     };
 
-    // ✅ FORM VALIDATION FUNCTION
-    const validateCheckoutForm = () => {
-        const { firstName, lastName, email, phone, address, city, state, zipCode, country } = shippingInfo;
-        const errors = {};
-        
-        // Check if all fields are filled
-        if (!firstName?.trim()) errors.firstName = "First name is required";
-        if (!lastName?.trim()) errors.lastName = "Last name is required";
-        if (!email?.trim()) errors.email = "Email is required";
-        if (!phone?.trim()) errors.phone = "Phone number is required";
-        if (!address?.trim()) errors.address = "Address is required";
-        if (!city?.trim()) errors.city = "City is required";
-        if (!state?.trim()) errors.state = "State is required";
-        if (!zipCode?.trim()) errors.zipCode = "Zip code is required";
-        if (!country?.trim()) errors.country = "Country is required";
-        
-        // Email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (email && !emailRegex.test(email)) errors.email = "Please enter a valid email";
-        
-        // Phone validation (basic - at least 10 digits)
-        const phoneRegex = /^\d{10,}$/;
-        if (phone && !phoneRegex.test(phone.replace(/\D/g, ''))) errors.phone = "Phone number must be at least 10 digits";
-        
-        setValidationErrors(errors);
-        return Object.keys(errors).length === 0; // Return true if no errors
+    // --- Helper: Update missing user profile fields after order ---
+    const updateUserProfileIfNeeded = async () => {
+        if (!user || !userProfile) return;
+        const updates = {};
+        if (!userProfile.name && shippingInfo.firstName) {
+            updates.name = `${shippingInfo.firstName} ${shippingInfo.lastName}`.trim();
+        }
+        if (!userProfile.email && shippingInfo.email) updates.email = shippingInfo.email;
+        if (!userProfile.country && shippingInfo.country) updates.country = shippingInfo.country;
+        if (!userProfile.address && shippingInfo.address) updates.address = shippingInfo.address;
+        if (!userProfile.phone && shippingInfo.phone) updates.phone = shippingInfo.phone;
+        if (!userProfile.city && shippingInfo.city) updates.city = shippingInfo.city;
+        if (!userProfile.state && shippingInfo.state) updates.state = shippingInfo.state;
+        if (!userProfile.zip && shippingInfo.zipCode) updates.zip = shippingInfo.zipCode;
+        if (Object.keys(updates).length > 0) {
+            try {
+                await service.updateUserProfile(user.$id, updates);
+            } catch (e) {
+                // Optionally log or ignore
+            }
+        }
     };
 
     // B. PayPal Handler
+    const buildVerifyPayload = (paymentMethod, extra = {}) => ({
+        paymentMethod,
+        userId: user.$id,
+        items: availableItems.map(item => item.$id),
+        shippingAddress: formatShippingAddress(),
+        customerName: `${shippingInfo.firstName} ${shippingInfo.lastName}`,
+        email: shippingInfo.email,
+        totalPaid: Number(finalTotal).toFixed(2),
+        currency: paymentMethod === 'Razorpay' ? 'INR' : 'USD',
+        ...extra,
+    });
+
     const handlePayPalApprove = async (data, actions) => {
         // ✅ VALIDATE FORM BEFORE PROCESSING
-        if (!validateCheckoutForm()) {
+        const { isValid, errors } = validateCheckoutFormSync();
+        if (!isValid) {
+            setValidationErrors(errors);
             alert("Please fill in all required fields correctly.");
             return;
         }
 
         setProcessing(true);
         try {
+            await actions.order.capture();
             const orderID = data.orderID;
 
-            const result = await service.verifyPayment({
-                orderID: orderID,
-                userId: user.$id,
-                items: availableItems.map(item => item.$id),
-                shippingAddress: formatShippingAddress(),
-                customerName: `${shippingInfo.firstName} ${shippingInfo.lastName}`,
-                email: shippingInfo.email,
-                totalPaid: finalTotal.toFixed(2),
-                currency: "USD",
-                paymentMethod: "PayPal"
-            });
+            const result = await service.verifyPayment(buildVerifyPayload('PayPal', {
+                orderID,
+            }));
 
             const errorMessage = result?.message || result?.error || 'Payment verification failed. Please retry.';
 
             if (!result || result.success !== true) {
                 throw new Error(errorMessage);
             }
-
+            await updateUserProfileIfNeeded();
             dispatch(clearCart());
             navigate('/orders', { state: { orderId: result.orderId } });
             alert('Payment successful! Your order is confirmed.');
         } catch (error) {
-//             console.error('Payment Error:', error);
+            //             console.error('Payment Error:', error);
             alert(`Payment Error: ${error?.message || 'Unable to verify the transaction. Please try again.'}`);
             await verifyStock();
         } finally {
@@ -303,42 +378,79 @@ const Checkout = () => {
         }
     };
 
+    const isMobile = useMemo(() => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent), []);
+
+    // 3. The standard UPI URI (Encoded for safety)
+    const upiString = useMemo(() => {
+        return `upi://pay?pa=${conf.indianPaymentUpiId}&pn=Adhunic%20Art&am=${finalTotal.toFixed(2)}&cu=INR&tn=ArtOrder`;
+    }, [finalTotal]);
+
+    // 4. Combined Pay Handler
     const handleIndianGatewayPay = async () => {
-        // ✅ VALIDATE FORM BEFORE PROCESSING
-        if (!validateCheckoutForm()) {
-            alert("Please fill in all required fields correctly.");
+        // 1. Basic Form Validation
+        const { isValid, errors } = validateCheckoutFormSync();
+        if (!isValid) {
+            setValidationErrors(errors);
+            alert("Please fill in shipping details first.");
             return;
         }
 
-        if (!indianUpiId) {
-            alert("Configure VITE_INDIAN_PAYMENT_UPI_ID in your .env file before using UPI payment.");
-            return;
-        }
+        setProcessing(true); // Start the loader
 
-        setProcessing(true);
         try {
-            await service.createCODOrder({
+            // 2. CREATE THE ORDER IN APPWRITE (The most important step)
+            const orderData = {
                 userId: user.$id,
                 items: availableItems.map(item => item.$id),
                 customerName: `${shippingInfo.firstName} ${shippingInfo.lastName}`,
                 email: shippingInfo.email,
                 shippingAddress: formatShippingAddress(),
                 totalAmount: finalTotal,
-                paymentMethod: primaryIndianPaymentMethod,
-                paymentId: `${primaryIndianPaymentMethod}-${Date.now()}`
-            });
+                paymentMethod: "UPI_QR",
+                paymentId: `PENDING-${Date.now()}`, // Placeholder ID for Admin verification
+                status: "Waiting for Payment"
+            };
 
-            dispatch(clearCart());
-            navigate('/orders');
-            alert(`Order created. Please complete payment using UPI ID ${indianUpiId}.`);
+            // Call your Appwrite service
+            const response = await service.createCODOrder(orderData);
+
+            if (response) {
+                // 3. IF ON MOBILE: Trigger the App Switcher
+                if (isMobile) {
+                    window.location.href = upiString;
+                }
+
+                // 4. THE "AUTO-CLOSE" FEEL
+                // We show a success message and then redirect, just like PayPal does.
+                await updateUserProfileIfNeeded();
+                dispatch(clearCart());
+
+                // Artificial delay to allow user to see the success state
+                setTimeout(() => {
+                    navigate('/orders', { state: { orderPlaced: true } });
+                }, 2000);
+            }
         } catch (error) {
-//             console.error('UPI Payment Error:', error);
-            alert(`UPI Payment failed: ${error?.message || 'Please try again.'}`);
-            await verifyStock();
+            console.error("Order Creation Error:", error);
+            alert("Connection Error: Order could not be saved. Please check your internet or Appwrite Platform settings.");
         } finally {
-            setProcessing(false);
+            // We keep processing true until navigation to prevent double-clicks
         }
     };
+
+    // const handlePhonePePay = () => {
+    //     const upiId = conf.indianPaymentUpiId; // Your personal UPI ID from .env
+    //     const name = "Adhunic Art";
+    //     const amount = finalTotal.toFixed(2);
+    //     const note = "Art Purchase";
+
+    //     // 1. Create the standard UPI String
+    //     const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(name)}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`;
+
+    //     // 2. Open the link
+    //     // On mobile: This will open a "chooser" (PhonePe, Google Pay, etc.)
+    //     window.location.href = upiLink;
+    // };
 
     const handleCopyUpiId = async () => {
         if (!indianUpiId) return;
@@ -346,8 +458,78 @@ const Checkout = () => {
             await navigator.clipboard.writeText(indianUpiId);
             alert('UPI ID copied to clipboard');
         } catch (copyError) {
-//             console.warn('Copy failed', copyError);
+            //             console.warn('Copy failed', copyError);
             alert('Copy failed. Please copy the UPI ID manually.');
+        }
+    };
+
+    const handleRazorpayPayment = async () => {
+        // 1. Validation
+        const { isValid, errors } = validateCheckoutFormSync();
+        if (!isValid) {
+            setValidationErrors(errors);
+            return;
+        }
+
+        setProcessing(true);
+        try {
+            const createOrderResponse = await service.createRazorpayOrder({
+                amount: finalTotal,
+                currency: selectedCurrency,
+                receipt: `receipt_${Date.now()}`,
+                items: availableItems.map(item => item.$id),
+                userId: user.$id,
+            });
+
+            if (!createOrderResponse || !createOrderResponse.orderId) {
+                throw new Error('Failed to create Razorpay order. Please try again.');
+            }
+
+            const options = {
+                key: conf.razorpayKeyId, // Your VITE_RAZORPAY_KEY_ID (rzp_test_...)
+                amount: Math.round(finalTotal * 100), // Amount in paise
+                currency: selectedCurrency,
+                name: "Adhunic Art",
+                description: "Original Artwork Purchase",
+                order_id: createOrderResponse.orderId,
+                // Prefill user data so they don't have to type it again
+                prefill: {
+                    name: `${shippingInfo.firstName} ${shippingInfo.lastName}`,
+                    email: shippingInfo.email,
+                    contact: shippingInfo.phone
+                },
+                handler: async function (response) {
+                    // THIS IS THE CRITICAL SDE STEP: 
+                    // We don't trust the frontend "success". We send details to Backend for verification.
+                    setProcessing(true);
+                    try {
+                        const verification = await service.verifyPayment(buildVerifyPayload('Razorpay', {
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature,
+                        }));
+
+                        if (verification.success) {
+                            await updateUserProfileIfNeeded();
+                            dispatch(clearCart());
+                            navigate('/orders', { state: { orderPlaced: true } });
+                        } else {
+                            alert(`Payment Verification Failed: ${verification.message || 'Please contact support.'}`);
+                        }
+                    } catch (error) {
+                        alert(`Payment Verification Failed: ${error?.message || 'Server error during verification.'}`);
+                    } finally {
+                        setProcessing(false);
+                    }
+                },
+                theme: { color: "#5f259f" }
+            };
+
+            const rzp1 = new window.Razorpay(options);
+            rzp1.open();
+        } catch (error) {
+            alert(`Unable to start Razorpay checkout: ${error?.message || 'Please try again.'}`);
+            setProcessing(false);
         }
     };
 
@@ -438,46 +620,31 @@ const Checkout = () => {
                             {/* --- MODIFIED SECTION START --- */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <input 
-                                        type="text" 
-                                        placeholder="First Name" 
-                                        className={`w-full border p-3 rounded-sm ${validationErrors.firstName ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
-                                        value={shippingInfo.firstName} 
-                                        onChange={(e) => {
-                                            setShippingInfo({ ...shippingInfo, firstName: e.target.value });
-                                            if (validationErrors.firstName) {
-                                                setValidationErrors({ ...validationErrors, firstName: '' });
-                                            }
-                                        }} 
+                                    <input
+                                        type="text"
+                                        placeholder="First Name"
+                                        className={`w-full border p-3 rounded-sm ${validationErrors.firstName ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+                                        value={shippingInfo.firstName || ''}
+                                        onChange={(e) => handleFieldChange('firstName', e.target.value)}
                                     />
                                     {validationErrors.firstName && <p className="text-red-500 text-xs mt-1">{validationErrors.firstName}</p>}
                                 </div>
                                 <div>
-                                    <input 
-                                        type="text" 
-                                        placeholder="Last Name" 
-                                        className={`w-full border p-3 rounded-sm ${validationErrors.lastName ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
-                                        value={shippingInfo.lastName} 
-                                        onChange={(e) => {
-                                            setShippingInfo({ ...shippingInfo, lastName: e.target.value });
-                                            if (validationErrors.lastName) {
-                                                setValidationErrors({ ...validationErrors, lastName: '' });
-                                            }
-                                        }} 
+                                    <input
+                                        type="text"
+                                        placeholder="Last Name"
+                                        className={`w-full border p-3 rounded-sm ${validationErrors.lastName ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+                                        value={shippingInfo.lastName || ''}
+                                        onChange={(e) => handleFieldChange('lastName', e.target.value)}
                                     />
                                     {validationErrors.lastName && <p className="text-red-500 text-xs mt-1">{validationErrors.lastName}</p>}
                                 </div>
                             </div>
                             <div>
-                                <select 
-                                    className={`w-full border p-3 rounded-sm bg-white ${validationErrors.country ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
-                                    value={shippingInfo.country} 
-                                    onChange={(e) => {
-                                        handleCountryChange(e);
-                                        if (validationErrors.country) {
-                                            setValidationErrors({ ...validationErrors, country: '' });
-                                        }
-                                    }}
+                                <select
+                                    className={`w-full border p-3 rounded-sm bg-white ${validationErrors.country ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+                                    value={shippingInfo.country}
+                                    onChange={handleCountryChange}
                                 >
                                     <option value="" disabled>Select Country</option>
                                     {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -485,185 +652,228 @@ const Checkout = () => {
                                 {validationErrors.country && <p className="text-red-500 text-xs mt-1">{validationErrors.country}</p>}
                             </div>
                             <div>
-                                <input 
-                                    type="text" 
-                                    placeholder="Use Local Address Like ( vilage or land mark )" 
-                                    className={`w-full border p-3 rounded-sm ${validationErrors.address ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
-                                    value={shippingInfo.address} 
-                                    onChange={(e) => {
-                                        setShippingInfo({ ...shippingInfo, address: e.target.value });
-                                        if (validationErrors.address) {
-                                            setValidationErrors({ ...validationErrors, address: '' });
-                                        }
-                                    }} 
+                                <input
+                                    type="text"
+                                    placeholder="Use Local Address Like ( vilage or land mark )"
+                                    className={`w-full border p-3 rounded-sm ${validationErrors.address ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+                                    value={shippingInfo.address || ''}
+                                    onChange={(e) => handleFieldChange('address', e.target.value)}
                                 />
                                 {validationErrors.address && <p className="text-red-500 text-xs mt-1">{validationErrors.address}</p>}
                             </div>
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
-                                    <input 
-                                        type="text" 
-                                        placeholder="City" 
-                                        className={`w-full border p-3 rounded-sm ${validationErrors.city ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
-                                        value={shippingInfo.city} 
-                                        onChange={(e) => {
-                                            setShippingInfo({ ...shippingInfo, city: e.target.value });
-                                            if (validationErrors.city) {
-                                                setValidationErrors({ ...validationErrors, city: '' });
-                                            }
-                                        }} 
+                                    <input
+                                        type="text"
+                                        placeholder="City"
+                                        className={`w-full border p-3 rounded-sm ${validationErrors.city ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+                                        value={shippingInfo.city || ''}
+                                        onChange={(e) => handleFieldChange('city', e.target.value)}
                                     />
                                     {validationErrors.city && <p className="text-red-500 text-xs mt-1">{validationErrors.city}</p>}
                                 </div>
                                 <div>
-                                    <input 
-                                        type="text" 
-                                        placeholder="State" 
-                                        className={`w-full border p-3 rounded-sm ${validationErrors.state ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
-                                        value={shippingInfo.state} 
-                                        onChange={(e) => {
-                                            setShippingInfo({ ...shippingInfo, state: e.target.value });
-                                            if (validationErrors.state) {
-                                                setValidationErrors({ ...validationErrors, state: '' });
-                                            }
-                                        }} 
+                                    <input
+                                        type="text"
+                                        placeholder="State"
+                                        className={`w-full border p-3 rounded-sm ${validationErrors.state ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+                                        value={shippingInfo.state || ''}
+                                        onChange={(e) => handleFieldChange('state', e.target.value)}
                                     />
                                     {validationErrors.state && <p className="text-red-500 text-xs mt-1">{validationErrors.state}</p>}
                                 </div>
                                 <div>
-                                    <input 
-                                        type="text" 
-                                        placeholder="Zip Code" 
-                                        className={`w-full border p-3 rounded-sm ${validationErrors.zipCode ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
-                                        value={shippingInfo.zipCode} 
-                                        onChange={(e) => {
-                                            setShippingInfo({ ...shippingInfo, zipCode: e.target.value });
-                                            if (validationErrors.zipCode) {
-                                                setValidationErrors({ ...validationErrors, zipCode: '' });
-                                            }
-                                        }} 
+                                    <input
+                                        type="text"
+                                        placeholder="Zip Code"
+                                        className={`w-full border p-3 rounded-sm ${validationErrors.zipCode ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+                                        value={shippingInfo.zipCode || ''}
+                                        onChange={(e) => handleFieldChange('zipCode', e.target.value)}
                                     />
                                     {validationErrors.zipCode && <p className="text-red-500 text-xs mt-1">{validationErrors.zipCode}</p>}
                                 </div>
                             </div>
                             <div className="space-y-4">
                                 <div>
-                                    <input 
-                                        type="tel" 
-                                        placeholder="Phone" 
-                                        className={`w-full border p-3 rounded-sm ${validationErrors.phone ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
-                                        value={shippingInfo.phone} 
-                                        onChange={(e) => {
-                                            setShippingInfo({ ...shippingInfo, phone: e.target.value });
-                                            if (validationErrors.phone) {
-                                                setValidationErrors({ ...validationErrors, phone: '' });
-                                            }
-                                        }} 
+                                    <input
+                                        type="tel"
+                                        placeholder="Phone"
+                                        className={`w-full border p-3 rounded-sm ${validationErrors.phone ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+                                        value={shippingInfo.phone || ''}
+                                        onChange={(e) => handleFieldChange('phone', e.target.value)}
                                     />
                                     {validationErrors.phone && <p className="text-red-500 text-xs mt-1">{validationErrors.phone}</p>}
                                 </div>
                                 <div>
-                                    <input 
-                                        type="email" 
-                                        placeholder="Email" 
-                                        className={`w-full border p-3 rounded-sm ${validationErrors.email ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} 
-                                        value={shippingInfo.email} 
-                                        onChange={(e) => {
-                                            setShippingInfo({ ...shippingInfo, email: e.target.value });
-                                            if (validationErrors.email) {
-                                                setValidationErrors({ ...validationErrors, email: '' });
-                                            }
-                                        }} 
+                                    <input
+                                        type="email"
+                                        placeholder="Email"
+                                        className={`w-full border p-3 rounded-sm ${validationErrors.email ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+                                        value={shippingInfo.email || ''}
+                                        onChange={(e) => handleFieldChange('email', e.target.value)}
                                     />
                                     {validationErrors.email && <p className="text-red-500 text-xs mt-1">{validationErrors.email}</p>}
                                 </div>
                             </div>
                             {/* --- MODIFIED SECTION END --- */}
 
-                            <div className="mt-8 pt-6 border-t border-gray-200">
-                                <h3 className="text-lg font-medium text-charcoal mb-4">Payment Method</h3>
-                                {!shippingInfo.country ? (
-                                    <div className="bg-yellow-50 text-yellow-800 p-3 text-sm rounded-sm text-center">Select Country to proceed</div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {selectedCurrency === "INR" && (
-                                            <div className="space-y-4">
-                                                {indianUpiId ? (
-                                                    <div className="p-4 bg-slate-50 rounded-sm text-sm text-slate-700">
-                                                        <p className="font-semibold">Pay using UPI</p>
-                                                        <p className="mt-3 text-lg tracking-wide">{indianUpiId}</p>
-                                                        <p className="mt-2 text-xs text-gray-500">{indianPaymentInstruction}</p>
-                                                        <p className="mt-2 text-xs text-gray-500">Scan or pay direct to the client using any UPI app.</p>
-                                                        <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                                                            <button
-                                                                type="button"
-                                                                onClick={handleCopyUpiId}
-                                                                className="flex-1 bg-charcoal hover:bg-black text-white font-bold py-3 rounded-sm transition-colors"
-                                                            >
-                                                                Copy UPI ID
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => { if (indianUpiLink) window.open(indianUpiLink, '_blank'); }}
-                                                                disabled={!indianUpiLink}
-                                                                className="flex-1 bg-white border border-gray-300 text-gray-700 font-bold py-3 rounded-sm transition-colors hover:bg-gray-100 disabled:bg-gray-200 disabled:text-gray-500"
-                                                            >
-                                                                Open UPI App
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="p-4 bg-yellow-50 rounded-sm text-sm text-yellow-900 border border-yellow-200">
-                                                        Configure <code>VITE_INDIAN_PAYMENT_UPI_ID</code> in your .env to enable UPI checkout.
-                                                    </div>
-                                                )}
 
-                                                <div className="grid gap-3">
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleIndianGatewayPay}
-                                                        disabled={processing || !indianUpiId}
-                                                        className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:text-gray-500 text-white font-bold py-3 rounded-sm transition-colors"
-                                                    >
-                                                        {processing ? <Loader2 className="animate-spin" /> : `Pay using ${primaryIndianPaymentMethod}`}
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleCODOrder}
-                                                        disabled={processing}
-                                                        className="w-full bg-white border border-gray-300 text-charcoal font-bold py-3 rounded-sm hover:bg-gray-50 transition-colors"
-                                                    >
-                                                        {processing ? <Loader2 className="animate-spin" /> : 'Cash on Delivery (COD)'}
-                                                    </button>
+                            {selectedCurrency === "INR" && (
+                                <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="bg-white border-2 border-purple-600/10 rounded-3xl p-8 shadow-xl shadow-purple-50/50">
+
+                                        {/* Header: Trust Signals */}
+                                        <div className="flex items-center justify-between mb-8">
+                                            <div className="flex items-center gap-4">
+                                                <div className="bg-purple-600 p-3 rounded-2xl shadow-lg shadow-purple-200">
+                                                    <ShieldCheck className="text-white" size={24} />
                                                 </div>
+                                                <div>
+                                                    <h4 className="font-bold text-charcoal text-lg leading-tight">Secure Payment</h4>
+                                                    <p className="text-[11px] text-gray-400 font-medium uppercase tracking-widest">Via Razorpay Secure</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md uppercase mb-1">Official Partner</span>
+                                                <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo-vector.svg" alt="UPI" className="h-4" />
+                                            </div>
+                                        </div>
 
-                                                <p className="text-center text-xs text-gray-500">Change gateway name or UPI ID in <code>.env</code> and restart the app.</p>
-                                            </div>
-                                        )}
-                                        {selectedCurrency === "USD" && (
-                                            <div className="relative z-0">
-                                                <p className="text-xs text-gray-500 mb-2 text-center">Secure payment via PayPal (Credit/Debit Cards)</p>
-                                                {console.log('Using PayPal Client ID for live payments:', conf.appwritePaypalClientId)}
-                                                <PayPalScriptProvider options={{ "client-id": conf.appwritePaypalClientId, currency: "USD", intent: "capture" }} key="paypal-usd">
-                                                    <PayPalButtons
-                                                        style={{ layout: "vertical", height: 48 }}
-                                                        createOrder={(data, actions) => {
-                                                            return actions.order.create({
-                                                                purchase_units: [{
-                                                                    description: `Art Order (${selectedCurrency})`,
-                                                                    amount: { currency_code: "USD", value: finalTotal.toFixed(2) }
-                                                                }]
-                                                            });
-                                                        }}
-                                                        onApprove={handlePayPalApprove}
-//                                                         onError={(err) => { console.error(err); alert("PayPal transaction failed. Please try again."); }}
-                                                    />
-                                                </PayPalScriptProvider>
-                                            </div>
-                                        )}
+                                        {/* Payment Method Details */}
+                                        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 mb-8">
+                                            <ul className="space-y-3">
+                                                <li className="flex items-center gap-3 text-sm text-slate-600">
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-purple-500"></div>
+                                                    Pay via UPI, Cards, or NetBanking
+                                                </li>
+                                                <li className="flex items-center gap-3 text-sm text-slate-600">
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-purple-500"></div>
+                                                    Instant order confirmation
+                                                </li>
+                                                <li className="flex items-center gap-3 text-sm text-slate-600">
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-purple-500"></div>
+                                                    Secure SSL encrypted transaction
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        {/* MAIN ACTION BUTTON */}
+                                        <div className="space-y-4">
+                                            <button
+                                                type="button"
+                                                onClick={handleRazorpayPayment} // Triggers the professional modal
+                                                disabled={processing}
+                                                className="w-full bg-[#5f259f] hover:bg-[#4d1e82] text-white py-5 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-3 shadow-xl shadow-purple-200 active:scale-[0.98] disabled:opacity-50"
+                                            >
+                                                {processing ? (
+                                                    <Loader2 className="animate-spin" />
+                                                ) : (
+                                                    <>
+                                                        <Smartphone size={22} />
+                                                        <span>Pay ₹{finalTotal.toLocaleString()} Now</span>
+                                                    </>
+                                                )}
+                                            </button>
+
+                                            {/* Secondary Option: COD */}
+                                            <button
+                                                type="button"
+                                                onClick={handleCODOrder}
+                                                className="w-full text-slate-400 text-xs font-bold py-2 hover:text-charcoal transition-colors uppercase tracking-[0.2em]"
+                                            >
+                                                Or Choose Cash on Delivery
+                                            </button>
+                                        </div>
                                     </div>
-                                )}
-                            </div>
+
+                                    {/* TRUST LOGOS */}
+                                    <div className="flex justify-center items-center gap-8 py-4 opacity-50 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-700">
+                                        <img src="https://www.vectorlogo.zone/logos/razorpay/razorpay-icon.svg" className="h-6" alt="Razorpay" />
+                                        <img src="https://www.vectorlogo.zone/logos/phonepe/phonepe-icon.svg" className="h-5" alt="PhonePe" />
+                                        <img src="https://www.vectorlogo.zone/logos/google_pay/google_pay-icon.svg" className="h-4" alt="GPay" />
+                                        <img src="https://www.vectorlogo.zone/logos/paytm/paytm-icon.svg" className="h-3" alt="Paytm" />
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedCurrency === "USD" && (
+                                <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="bg-white border-2 border-slate-300 rounded-3xl p-8 shadow-xl shadow-slate-50/50">
+
+                                        <div className="flex items-center justify-between mb-8">
+                                            <div className="flex items-center gap-4">
+                                                <div className="bg-slate-900 p-3 rounded-2xl shadow-lg shadow-slate-200">
+                                                    <ShoppingBag className="text-white" size={24} />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-charcoal text-lg leading-tight">Secure Payment</h4>
+                                                    <p className="text-[11px] text-gray-400 font-medium uppercase tracking-widest">Via PayPal Secure</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md uppercase mb-1">Trusted Checkout</span>
+                                                <img src="https://www.vectorlogo.zone/logos/paypal/paypal-icon.svg" alt="PayPal" className="h-6" />
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 mb-8">
+                                            <ul className="space-y-3 text-sm text-slate-600">
+                                                <li className="flex items-center gap-3">
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-slate-700"></div>
+                                                    Pay using PayPal, cards, or debit.
+                                                </li>
+                                                <li className="flex items-center gap-3">
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-slate-700"></div>
+                                                    Global checkout with instant confirmation.
+                                                </li>
+                                                <li className="flex items-center gap-3">
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-slate-700"></div>
+                                                    Secure encrypted payments.
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        <PayPalScriptProvider options={paypalOptions}>
+                                            <PayPalButtons
+                                                style={{ layout: 'vertical', color: 'blue', label: 'paypal', shape: 'rect', tagline: false }}
+                                                forceReRender={[finalTotal, shippingInfo.country, shippingInfo.email, shippingInfo.firstName, shippingInfo.lastName]}
+                                                createOrder={(data, actions) => {
+                                                    return actions.order.create({
+                                                        purchase_units: [
+                                                            {
+                                                                amount: {
+                                                                    currency_code: 'USD',
+                                                                    value: finalTotal.toFixed(2),
+                                                                },
+                                                            },
+                                                        ],
+                                                    });
+                                                }}
+                                                onApprove={handlePayPalApprove}
+                                                onClick={handlePayPalButtonClick}
+                                                onError={(err) => {
+                                                    console.error('PayPal error:', err);
+                                                    alert('PayPal payment failed. Please try again.');
+                                                }}
+                                            />
+                                        </PayPalScriptProvider>
+
+                                        <button
+                                            type="button"
+                                            onClick={handleCODOrder}
+                                            className="w-full mt-4 text-slate-400 text-xs font-bold py-2 hover:text-charcoal transition-colors uppercase tracking-[0.2em]"
+                                        >
+                                            Or Choose Cash on Delivery
+                                        </button>
+                                    </div>
+
+                                    <div className="flex justify-center items-center gap-8 py-4 opacity-50 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-700">
+                                        <img src="https://www.vectorlogo.zone/logos/paypal/paypal-icon.svg" className="h-6" alt="PayPal" />
+                                        <img src="https://www.vectorlogo.zone/logos/visa/visa-icon.svg" className="h-6" alt="Visa" />
+                                        <img src="https://www.vectorlogo.zone/logos/mastercard/mastercard-icon.svg" className="h-6" alt="Mastercard" />
+                                    </div>
+                                </div>
+                            )}
                         </form>
                     </section>
                 </div>

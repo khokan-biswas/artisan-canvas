@@ -3,13 +3,14 @@ import authService from '../backend/auth';
 import { Link, useNavigate } from 'react-router-dom';
 import { login as authLogin } from '../store/authSlice';
 import { useDispatch } from 'react-redux';
-import { Loader2, User, Mail, Lock, Globe, Phone } from 'lucide-react';
+import { Loader2, User, Mail, Lock, Globe, Phone, Eye, EyeOff } from 'lucide-react';
 import { COUNTRIES } from '../constants/countries';
 
 const Signup = () => {
     const navigate = useNavigate();
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const dispatch = useDispatch();
     const [registerData, setRegisterData] = useState({
         name: "", email: "", password: "", country: "India", phone: ""
@@ -52,7 +53,14 @@ const Signup = () => {
                     </div>
                     <div className="relative">
                         <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                        <input type="password" name="password" placeholder="Password" value={registerData.password} onChange={handleChange} className="w-full pl-10 p-3 border border-gray-200 rounded-sm outline-none" required />
+                        <input type={showPassword ? "text" : "password"} name="password" placeholder="Password" value={registerData.password} onChange={handleChange} className="w-full pl-10 pr-10 p-3 border border-gray-200 rounded-sm outline-none" required />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-3 text-gray-400 hover:text-charcoal transition"
+                        >
+                            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
                     </div>
                     <div className="relative">
                         <Globe className="absolute left-3 top-3 h-5 w-5 text-gray-400" />

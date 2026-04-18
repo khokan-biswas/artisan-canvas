@@ -142,7 +142,11 @@ export class Service {
         "POST",
         { "Content-Type": "application/json" },
       );
-      return JSON.parse(execution.responseBody);
+      const response = JSON.parse(execution.responseBody);
+      if (response.success === false) {
+        throw new Error(response.message || "Payment verification failed.");
+      }
+      return response;
     } catch (error) {
       //       console.error("Appwrite service :: verifyPayment :: error", error);
       return {
@@ -150,6 +154,35 @@ export class Service {
         error: true,
         message: error?.message || "Payment verification request failed.",
       };
+    }
+  }
+
+  async createRazorpayOrder({ amount, currency = 'INR', receipt = null, items = [], userId }) {
+    try {
+      const execution = await this.functions.createExecution(
+        conf.appwritePaymentFunctionId,
+        JSON.stringify({
+          paymentMethod: 'RazorpayCreateOrder',
+          amount: Number(amount),
+          currency,
+          receipt,
+          items,
+          userId,
+        }),
+        false,
+        "/",
+        "POST",
+        { "Content-Type": "application/json" },
+      );
+
+      const response = JSON.parse(execution.responseBody);
+      if (response.success === false) {
+        throw new Error(response.message || "Unable to create Razorpay order.");
+      }
+      return response;
+    } catch (error) {
+      //       console.error("Appwrite service :: createRazorpayOrder :: error", error);
+      throw error;
     }
   }
 
@@ -204,7 +237,11 @@ export class Service {
       }
 
       const normalizedPaymentId = paymentId || `${paymentMethod}-${Date.now()}`;
-      const status = paymentMethod === "COD" ? "COD" : paymentMethod;
+      const status = paymentMethod === "COD"
+        ? "COD"
+        : paymentMethod === "UPI_QR"
+          ? "Waiting for Payment"
+          : paymentMethod;
 
       // C. Create Order Document
       return await this.databases.createDocument(
@@ -216,6 +253,7 @@ export class Service {
           paintingId: paintingIds.join(","),
           amount: parseFloat(totalAmount) || 0,
           paymentId: normalizedPaymentId,
+          method: paymentMethod,
           status,
           customerName,
           email,
@@ -281,53 +319,6 @@ export class Service {
       return response.data;
     } catch (error) {
       //       console.error("Appwrite service :: createPhonePeOrder :: error", error);
-      throw error;
-    }
-  }
-
-  // 2. PayPal Verification (Capture Payment)
-  async verifyPayment({
-    orderID,
-    userId,
-    items,
-    shippingAddress,
-    customerName,
-    email,
-    totalPaid,
-    currency,
-    paymentMethod,
-  }) {
-    try {
-      const payload = {
-        paymentMethod: "PayPal",
-        orderID,
-        userId,
-        items,
-        shippingDetails: shippingAddress,
-        customerName,
-        email,
-        totalPaid,
-        currency,
-      };
-
-      const execution = await this.functions.createExecution(
-        conf.appwritePaymentFunctionId,
-        JSON.stringify(payload),
-        false,
-        "/",
-        "POST",
-        { "Content-Type": "application/json" },
-      );
-
-      const response = JSON.parse(execution.responseBody);
-
-      if (!response.success) {
-        throw new Error(response.message || "PayPal verification failed");
-      }
-
-      return response;
-    } catch (error) {
-      //       console.error("Appwrite service :: verifyPayment :: error", error);
       throw error;
     }
   }

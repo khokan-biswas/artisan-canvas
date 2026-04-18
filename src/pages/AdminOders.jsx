@@ -249,7 +249,7 @@ const AdminOrders = () => {
                                 const orderTotal = parseFloat(order.amount) || 0;
                                 const currency = order.currency === 'INR' ? '₹' : '$';
                                 const statusLabel = order.status || 'Pending';
-                                const paymentMethod = order.paymentId && order.paymentId.includes('COD') ? 'COD' : 'PayPal';
+                                const paymentMethod = order.paymentId && order.paymentId.includes('COD') ? 'COD' : (order.currency === 'INR' ? 'Razorpay' : 'PayPal');
 
                                 return (
                                     <div
@@ -406,7 +406,7 @@ const AdminOrders = () => {
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-gray-500 text-xs font-medium uppercase tracking-tight">
-                                            {order.paymentId && order.paymentId.includes("COD") ? "COD" : "PayPal"}
+                                            {order.paymentId && order.paymentId.includes("COD") ? "COD" : (order.currency === 'INR' ? "Razorpay" : "PayPal")}
                                         </td>
                                         <td className="px-6 py-4 text-right font-medium text-charcoal">
                                             {currency}{orderTotal.toLocaleString()}

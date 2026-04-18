@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import service from '../backend/config'; 
 import OptimizedImage from '../components/OptimizedImage';
-import { LayoutDashboard, Package, ShoppingCart, Users, Palette, Settings, Search, ChevronDown, Plus, Edit, Tag } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Users, Palette, Search, ChevronDown, Plus, Edit, Tag } from 'lucide-react';
 
 // ... (Keep SidebarItem and StatusBadge components) ...
 const SidebarItem = ({ icon: Icon, label, to = "#", active }) => (
@@ -109,7 +109,6 @@ const AdminProducts = () => {
             <SidebarItem icon={ShoppingCart} label="Orders" to="/admin/orders" />
             <SidebarItem icon={Users} label="Customers" to="/admin/customers" />
             <SidebarItem icon={Palette} label="Upload" to="/admin/upload" />
-            <SidebarItem icon={Settings} label="Settings" to="/admin/settings" />
         </nav>
       </aside>
 

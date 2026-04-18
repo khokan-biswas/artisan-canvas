@@ -8,7 +8,6 @@ import {
   ShoppingCart, 
   Users, 
   Palette, 
-  Settings, 
   TrendingUp, 
   DollarSign, 
   AlertCircle, 
@@ -276,7 +275,6 @@ const AdminDashboard = () => {
             <SidebarItem icon={ShoppingCart} label="Orders" to="/admin/orders" />
             <SidebarItem icon={Users} label="Customers" to="/admin/customers" />
             <SidebarItem icon={Palette} label="Upload" to="/admin/upload" />
-            <SidebarItem icon={Settings} label="Settings" to="#" />
         </nav>
       </aside>
 
@@ -366,14 +364,11 @@ const AdminDashboard = () => {
                         <div className="bg-white rounded-2xl border border-gray-200 shadow-[0_2px_10px_rgb(0,0,0,0.04)] h-full overflow-hidden flex flex-col">
                             
                             {/* Card Header */}
-                            <div className="p-6 pb-2 border-b border-gray-50 flex justify-between items-start">
+                            <div className="p-6 pb-2 border-b border-gray-50">
                                 <div>
                                     <h3 className="text-lg font-serif font-bold text-charcoal">Sales Overview</h3>
                                     <p className="text-xs text-gray-400 mt-1">Monthly performance history</p>
                                 </div>
-                                <button className="p-2 hover:bg-gray-50 rounded-full text-gray-400 hover:text-charcoal transition">
-                                    <Settings size={16} />
-                                </button>
                             </div>
 
                             {/* Key Metric Highlight */}

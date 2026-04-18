@@ -121,7 +121,7 @@ const HomePage = () => {
                 <button
                   key={cat}
                   onClick={() => scrollToSection(cat)}
-                  className="flex flex-col items-center justify-center w-20 h-14 rounded-md border border-gray-200 bg-white text-[10px] text-center px-2 py-2 hover:border-charcoal hover:shadow-sm transition focus:outline-none"
+                  className="flex flex-col items-center justify-center w-20 h-20 rounded-md border border-gray-200 bg-white text-[10px] text-center px-2 py-2 hover:border-charcoal hover:shadow-sm transition focus:outline-none"
                 >
                   <div className="w-14 h-10 border border-gray-300 rounded-md flex items-center justify-center bg-white hover:border-charcoal hover:shadow-sm transition-all duration-300 relative overflow-hidden">
                     {thumbUrl ? (

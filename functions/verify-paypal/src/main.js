@@ -1,218 +1,116 @@
 const sdk = require("node-appwrite");
 const checkoutNodeJssdk = require("@paypal/checkout-server-sdk");
-const crypto = require("crypto"); // Built-in Node module for PhonePe hashing
+const Razorpay = require("razorpay");
+const crypto = require("crypto");
 
 module.exports = async function (context) {
   const client = new sdk.Client();
   const databases = new sdk.Databases(client);
 
-  // 1. Initialize Appwrite
-  if (
-    !process.env.APPWRITE_ENDPOINT ||
-    !process.env.APPWRITE_PROJECT_ID ||
-    !process.env.APPWRITE_API_KEY
-  ) {
-    context.error("❌ Missing Appwrite Environment Variables");
-    return context.res.json(
-      { success: false, message: "Server Configuration Error" },
-      500
-    );
-  }
-
   client
-    .setEndpoint(process.env.APPWRITE_ENDPOINT)
+    .setEndpoint(process.env.APPWRITE_ENDPOINT || process.env.APPWRITE_URL)
     .setProject(process.env.APPWRITE_PROJECT_ID)
     .setKey(process.env.APPWRITE_API_KEY);
 
-  // --- HELPER LOGS ---
-  const log = (msg) => context.log(`[Payment Fn]: ${msg}`);
-  const errorLog = (msg) => context.error(`[Payment Fn Error]: ${msg}`);
+  let payload = context.req.body;
+  if (typeof payload === "string") payload = JSON.parse(payload);
 
-  // 2. PARSE PAYLOAD
-  let payload = {};
-  try {
-    if (context.req.body) {
-      payload =
-        typeof context.req.body === "string"
-          ? JSON.parse(context.req.body)
-          : context.req.body;
-    } else if (context.payload) {
-      payload =
-        typeof context.payload === "string"
-          ? JSON.parse(context.payload)
-          : context.payload;
-    }
-  } catch (e) {
-    errorLog("JSON Parse Failed: " + e.message);
-    return context.res.json(
-      { success: false, message: "Invalid JSON Body" },
-      400
-    );
-  }
-
-  const {
-    paymentMethod, // "PayPal" or "PhonePe_Initiate"
-    orderID, // For PayPal
-    items,
-    userId,
-    shippingDetails,
-    customerName,
-    email,
-    totalPaid,
-    amount, // For PhonePe
-    mobileNumber, // For PhonePe
-  } = payload;
-
-  log(`Processing Request: ${paymentMethod} | User: ${userId}`);
+  const { paymentMethod } = payload;
 
   try {
-    // ============================================================
-    // 🅰️ OPTION A: PHONEPE INITIATION (Generate Checksum)
-    // ============================================================
-    if (paymentMethod === "PhonePe_Initiate") {
-      log("Initiating PhonePe Transaction...");
-
-      const MERCHANT_ID = process.env.PHONEPE_MERCHANT_ID;
-      const SALT_KEY = process.env.PHONEPE_SALT_KEY;
-      const SALT_INDEX = process.env.PHONEPE_SALT_INDEX || "1";
-      const ENV = process.env.PHONEPE_ENV || "UAT"; // "UAT" or "PROD"
-
-      const merchantTransactionId = `T${Date.now()}`; // Unique ID
-
-      const normalPayload = {
-        merchantId: MERCHANT_ID,
-        merchantTransactionId: merchantTransactionId,
-        merchantUserId: userId,
-        amount: amount * 100, // Convert to Paise (INR)
-        redirectUrl: "https://your-website.com/orders", // Update this!
-        redirectMode: "REDIRECT",
-        callbackUrl: "https://your-website.com/api/phonepe-webhook", // Optional
-        mobileNumber: mobileNumber,
-        paymentInstrument: {
-          type: "PAY_PAGE",
-        },
-      };
-
-      // 1. Base64 Encode Payload
-      const base64Payload = Buffer.from(JSON.stringify(normalPayload)).toString(
-        "base64"
-      );
-
-      // 2. Generate Checksum: SHA256(Base64 + "/pg/v1/pay" + SaltKey) + ### + SaltIndex
-      const stringToHash = base64Payload + "/pg/v1/pay" + SALT_KEY;
-      const sha256 = crypto
-        .createHash("sha256")
-        .update(stringToHash)
-        .digest("hex");
-      const checksum = `${sha256}###${SALT_INDEX}`;
-
-      // 3. Return Data to Frontend
-      return context.res.json({
-        success: true,
-        data: {
-          payload: base64Payload,
-          checksum: checksum,
-          transactionId: merchantTransactionId,
-          url:
-            ENV === "PROD"
-              ? "https://api.phonepe.com/apis/hermes/pg/v1/pay"
-              : "https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/pay",
-        },
+    // --- 🆕 1. RAZORPAY ORDER CREATION (This was missing!) ---
+    if (paymentMethod === "RazorpayCreateOrder") {
+      context.log("Creating Razorpay Order...");
+      const razorpay = new Razorpay({
+        key_id: (process.env.RAZORPAY_KEY_ID || "").trim(),
+        key_secret: (process.env.RAZORPAY_KEY_SECRET || "").trim(),
       });
+
+      const order = await razorpay.orders.create({
+        amount: Math.round(Number(payload.amount) * 100), // convert to paise
+        currency: payload.currency || "INR",
+        receipt: `rcpt_${Date.now()}`,
+      });
+
+      return context.res.json({ success: true, orderId: order.id });
     }
 
-    // ============================================================
-    // 🅱️ OPTION B: PAYPAL VERIFICATION (Capture & Save)
-    // ============================================================
+    // --- 🅰️ 2. RAZORPAY VERIFICATION (After payment) ---
+    if (paymentMethod === "Razorpay") {
+      context.log("Processing Razorpay Verification...");
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, totalPaid } = payload;
+      
+      const secret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
+      const generatedSignature = crypto
+        .createHmac("sha256", secret)
+        .update(razorpay_order_id + "|" + razorpay_payment_id)
+        .digest("hex");
+
+      if (generatedSignature !== razorpay_signature) {
+        return context.res.json({ success: false, message: "Invalid Razorpay Signature" }, 400);
+      }
+
+      return await finalizeOrder(databases, payload, razorpay_payment_id, "INR", context);
+    }
+
+    // --- 🅱️ 3. PAYPAL FLOW (Working) ---
     if (paymentMethod === "PayPal") {
-      log("Verifying PayPal Order...");
+      context.log("Processing PayPal...");
+      const { orderID, totalPaid } = payload;
 
-      if (!orderID || !items) {
-        return context.res.json(
-          { success: false, message: "Missing PayPal Data" },
-          400
-        );
+      const env = process.env.PAYPAL_ENVIRONMENT === "production" 
+        ? new checkoutNodeJssdk.core.LiveEnvironment(process.env.PAYPAL_CLIENT_ID, process.env.PAYPAL_SECRET)
+        : new checkoutNodeJssdk.core.SandboxEnvironment(process.env.PAYPAL_CLIENT_ID, process.env.PAYPAL_SECRET);
+      
+      const paypalClient = new checkoutNodeJssdk.core.PayPalHttpClient(env);
+      const capture = await paypalClient.execute(new checkoutNodeJssdk.orders.OrdersCaptureRequest(orderID));
+
+      if (capture.result.status === "COMPLETED") {
+        return await finalizeOrder(databases, payload, capture.result.id, "USD", context);
       }
-
-      // 1. Setup PayPal Client
-      const Environment =
-        process.env.PAYPAL_ENVIRONMENT === "production"
-          ? checkoutNodeJssdk.core.LiveEnvironment
-          : checkoutNodeJssdk.core.SandboxEnvironment;
-
-      const paypalClient = new checkoutNodeJssdk.core.PayPalHttpClient(
-        new Environment(
-          process.env.PAYPAL_CLIENT_ID,
-          process.env.PAYPAL_SECRET
-        )
-      );
-
-      // 2. Capture Payment
-      const request = new checkoutNodeJssdk.orders.OrdersCaptureRequest(
-        orderID
-      );
-      request.requestBody({});
-      const capture = await paypalClient.execute(request);
-
-      if (capture.result.status !== "COMPLETED") {
-        throw new Error(`PayPal Status: ${capture.result.status}`);
-      }
-
-      log("💰 PayPal Payment Captured.");
-
-      // 3. Mark Items as Sold
-      const soldItems = Array.isArray(items) ? items : [items];
-      for (const id of soldItems) {
-        await databases.updateDocument(
-          process.env.APPWRITE_DATABASE_ID,
-          process.env.APPWRITE_PAINTINGS_COLLECTION_ID,
-          id,
-          { isSold: true }
-        );
-      }
-
-      // 4. Create Order in Database
-      const orderDoc = await databases.createDocument(
-        process.env.APPWRITE_DATABASE_ID,
-        process.env.APPWRITE_ORDERS_COLLECTION_ID,
-        sdk.ID.unique(),
-        {
-          userId,
-          customerName: customerName || "Guest",
-          email: email || "no-email",
-          paintingId: soldItems.join(","),
-          amount: parseFloat(totalPaid),
-          shippingAddress:
-            typeof shippingDetails === "object"
-              ? JSON.stringify(shippingDetails)
-              : String(shippingDetails),
-          paymentId: capture.result.id,
-          status: "Paid",
-          currency: "USD", // ✅ Explicitly saving as USD
-        }
-      );
-
-      log(`🎉 Order Created: ${orderDoc.$id}`);
-      return context.res.json({ success: true, orderId: orderDoc.$id });
     }
 
-    return context.res.json(
-      { success: false, message: "Invalid Payment Method" },
-      400
-    );
-  } catch (error) {
-    errorLog("CRITICAL ERROR: " + error.message);
-    return context.res.json({ success: false, error: error.message }, 500);
+    // This triggers if paymentMethod doesn't match any IF above
+    return context.res.json({ success: false, message: `Unsupported Method: ${paymentMethod}` }, 400);
+
+  } catch (err) {
+    context.error(err.message);
+    return context.res.json({ success: false, error: err.message }, 500);
   }
 };
 
+// --- DATABASE HELPER ---
+async function finalizeOrder(databases, data, payId, currency, context) {
+    const { items, userId, totalPaid, customerName, email, shippingAddress } = data;
+    const soldItems = Array.isArray(items) ? items : String(items).split(",");
 
-// thise are the environment variables you need to set for this function to work properly:
+    try {
+        for (const id of soldItems) {
+            await databases.updateDocument(process.env.APPWRITE_DATABASE_ID, process.env.APPWRITE_PAINTINGS_COLLECTION_ID, id.trim(), { isSold: true });
+        }
 
-// PHONEPE_MERCHANT_ID
+        const orderPayload = {
+            userId: String(userId),
+            paintingId: soldItems.join(", ").substring(0, 254),
+            amount: parseFloat(totalPaid),
+            customerName: String(customerName || "Guest"),
+            shippingAddress: String(shippingAddress || "Direct").substring(0, 499),
+            paymentId: String(payId),
+            status: "Paid",
+            email: String(email),
+            ordercomplete: "no",
+            currency: String(currency)
+        };
 
-// PHONEPE_SALT_KEY
+        const order = await databases.createDocument(
+            process.env.APPWRITE_DATABASE_ID,
+            process.env.APPWRITE_ORDERS_COLLECTION_ID,
+            sdk.ID.unique(),
+            orderPayload
+        );
 
-// PHONEPE_SALT_INDEX
-
-// PHONEPE_ENV (Set to UAT for testing, PROD for live)
+        return context.res.json({ success: true, orderId: order.$id });
+    } catch (dbError) {
+        return context.res.json({ success: false, message: "Database Error", error: dbError.message }, 500);
+    }
+}

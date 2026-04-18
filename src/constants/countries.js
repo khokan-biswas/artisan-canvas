@@ -24,7 +24,7 @@ export const SHIPPING_RATES_USD = {
 
 // Shipping costs by country
 export const SHIPPING_RATES_INR = {
-  "India": 99,
+  "India": 0,
   "USA": 99,
   "Canada": 99,
   "UK": 99,

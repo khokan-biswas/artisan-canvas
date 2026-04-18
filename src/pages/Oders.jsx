@@ -79,11 +79,29 @@ const Orders = () => {
     };
 
     const getStatusColor = (status) => {
-        const s = status.toLowerCase();
+        const s = String(status || '').toLowerCase();
         if (s === 'paid' || s === 'completed') return 'bg-green-100 text-green-800 border-green-200';
         if (s === 'shipped') return 'bg-blue-100 text-blue-800 border-blue-200';
+        if (s === 'cod' || s === 'waiting for payment') return 'bg-yellow-100 text-yellow-800 border-yellow-200';
         if (s === 'cancelled') return 'bg-red-100 text-red-800 border-red-200';
         return 'bg-gray-100 text-gray-800 border-gray-200';
+    };
+
+    const getPaymentMethodLabel = (order) => {
+        if (order.method) {
+            if (order.method === 'COD') return 'Cash on Delivery';
+            if (order.method === 'UPI_QR') return 'UPI';
+            return order.method;
+        }
+
+        if (order.paymentId) {
+            if (order.paymentId.includes('COD')) return 'Cash on Delivery';
+            if (order.paymentId.includes('UPI')) return 'UPI';
+            if (order.paymentId.toLowerCase().includes('razorpay')) return 'Razorpay';
+            if (order.paymentId.toLowerCase().includes('paypal')) return 'PayPal';
+        }
+
+        return 'PayPal';
     };
 
     if (loading) {
@@ -188,10 +206,10 @@ const Orders = () => {
                                     </div>
 
                                     {/* Footer / Actions */}
-                                    <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-end">
-                                        {/* Optional: Add 'Track Package' or 'Invoice' buttons here later */}
+                                    <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+                                        <div className="text-xs text-gray-500">{getPaymentMethodLabel(order)}</div>
                                         <p className="text-xs text-gray-400 flex items-center gap-1">
-                                            <CreditCard size={12} /> Paid via PayPal
+                                            <CreditCard size={12} /> {order.status === 'COD' ? 'Payment on delivery' : `Paid via ${getPaymentMethodLabel(order)}`}
                                         </p>
                                     </div>
                                 </div>

@@ -15,6 +15,7 @@ import UserDetails from './pages/UserDetails.jsx';
 const HomePage = React.lazy(() => import('./pages/HomePage.jsx'));
 const Login = React.lazy(() => import('./pages/Login.jsx'));
 const Signup = React.lazy(() => import('./pages/Signup.jsx'));
+const ResetPassword = React.lazy(() => import('./pages/ResetPassword.jsx'));
 const Shop = React.lazy(() => import('./pages/Shop.jsx'));
 const ProductDetails = React.lazy(() => import('./pages/ProductDetails.jsx'));
 const Checkout = React.lazy(() => import('./pages/Checkout.jsx'));
@@ -23,7 +24,6 @@ const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard.jsx'));
 const AdminProducts = React.lazy(() => import('./pages/AdminProducts.jsx'));
 const AdminOrders = React.lazy(() => import('./pages/AdminOders.jsx'));
 const AdminCustomers = React.lazy(() => import('./pages/AdminCustomers.jsx'));
-const AdminSettings = React.lazy(() => import('./pages/AdminSettings.jsx'));
 const Orders = React.lazy(() => import('./pages/Oders.jsx'));
 
 
@@ -76,6 +76,10 @@ const router = createBrowserRouter([
         element: <AuthLayout authentication={false}><Suspense fallback={<PageLoader />}><Signup /></Suspense></AuthLayout>
       },
       {
+        path: "/reset-password",
+        element: <AuthLayout authentication={false}><Suspense fallback={<PageLoader />}><ResetPassword /></Suspense></AuthLayout>
+      },
+      {
         path: "/checkout",
         element: <AuthLayout authentication={true}><Suspense fallback={<PageLoader />}><Checkout /></Suspense></AuthLayout>
       },
@@ -94,7 +98,6 @@ const router = createBrowserRouter([
       { path: "/admin/products", element: <AuthLayout authentication={true} adminOnly={true}><Suspense fallback={<PageLoader />}><AdminProducts /></Suspense></AuthLayout> },
       { path: "/admin/orders", element: <AuthLayout authentication={true} adminOnly={true}><Suspense fallback={<PageLoader />}><AdminOrders /></Suspense></AuthLayout> },
       { path: "/admin/customers", element: <AuthLayout authentication={true} adminOnly={true}><Suspense fallback={<PageLoader />}><AdminCustomers /></Suspense></AuthLayout> },
-      { path: "/admin/settings", element: <AuthLayout authentication={true} adminOnly={true}><Suspense fallback={<PageLoader />}><AdminSettings /></Suspense></AuthLayout> },
     ],
   },
 ]);
