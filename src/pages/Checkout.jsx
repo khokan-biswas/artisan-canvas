@@ -12,7 +12,7 @@ import { Loader2, Trash2, ShoppingBag, ChevronLeft, Truck, Smartphone, ShieldChe
 import { COUNTRIES, SHIPPING_RATES_USD, SHIPPING_RATES_INR } from '../constants/countries.js';
 
 // 💱 Exchange Rate
-const EXCHANGE_RATE = 84;
+// const EXCHANGE_RATE = 84;
 
 const Checkout = () => {
     const navigate = useNavigate();
@@ -57,13 +57,13 @@ const Checkout = () => {
     const handlePayPalButtonClick = (data, actions) => {
         // 1. Run sync validation immediately (no async, no setTimeout)
         const { isValid, errors } = validateCheckoutFormSync();
-        
+
         if (!isValid) {
             setValidationErrors(errors);
             alert("Please complete the shipping form first.");
             return actions.reject(); // Tells PayPal: "Do not open popup"
         }
-        
+
         return actions.resolve(); // Tells PayPal: "Everything is good, open now"
     };
 
@@ -159,7 +159,7 @@ const Checkout = () => {
 
         if (newVal && userProfile) {
             const savedCountry = userProfile.country || '';
-            
+
             // Split name into firstName and lastName
             const nameParts = (userProfile.name || '').split(' ');
             const firstName = nameParts[0] || '';
@@ -187,7 +187,7 @@ const Checkout = () => {
                 setSelectedCurrency("USD");
                 setShippingCost(SHIPPING_RATES_USD[savedCountry] || SHIPPING_RATES_USD["Other"]);
             }
-            
+
             // 3. Clear any validation errors when using saved address
             setValidationErrors({});
         }
@@ -245,10 +245,10 @@ const Checkout = () => {
     // --- HANDLERS ---
     const handleCountryChange = (e) => {
         const country = e.target.value;
-        
+
         // Update shipping info first
         handleFieldChange('country', country);
-        
+
         // Then update currency and shipping cost based on country
         if (country === "India") {
             setSelectedCurrency("INR");
@@ -277,7 +277,7 @@ const Checkout = () => {
 
     // A. COD Handler
     const handleCODOrder = async () => {
-        // ✅ VALIDATE FORM BEFORE PROCESSING
+        // 1. Validate Form
         const { isValid, errors } = validateCheckoutFormSync();
         if (!isValid) {
             setValidationErrors(errors);
@@ -287,19 +287,36 @@ const Checkout = () => {
 
         setProcessing(true);
         try {
+            // 2. Call Service with MATCHING KEYS
+            // Your service.js expects: { userId, items, customerName, email, shippingAddress, totalAmount }
             await service.createCODOrder({
                 userId: user.$id,
+
+                // This must be 'items' (the backend handles the .join(',') part)
                 items: availableItems.map(item => item.$id),
+
                 customerName: `${shippingInfo.firstName} ${shippingInfo.lastName}`,
                 email: shippingInfo.email,
-                shippingAddress: formatShippingAddress(), // ✅ Formatted String
-                totalAmount: finalTotal
+                shippingAddress: formatShippingAddress(),
+
+                // This must be 'totalAmount' to match your service's arguments
+                totalAmount: finalTotal,
+
+                paymentMethod: "COD"
             });
+
+            // 3. Post-Order Success
             await updateUserProfileIfNeeded();
             dispatch(clearCart());
+
+            alert("Order placed successfully! Redirecting to your orders...");
             navigate('/orders');
+
         } catch (error) {
+            console.error("Appwrite Order Error:", error);
             alert(`Order Failed: ${error.message}`);
+
+            // Refresh stock status if order failed due to availability
             await verifyStock();
         } finally {
             setProcessing(false);
@@ -497,6 +514,12 @@ const Checkout = () => {
                     name: `${shippingInfo.firstName} ${shippingInfo.lastName}`,
                     email: shippingInfo.email,
                     contact: shippingInfo.phone
+                },
+                modal: {
+                    ondismiss: function () {
+                        setProcessing(false); // This stops the loading spinner when user closes the modal
+                        console.log("Checkout form closed by user");
+                    }
                 },
                 handler: async function (response) {
                     // THIS IS THE CRITICAL SDE STEP: 
@@ -757,31 +780,35 @@ const Checkout = () => {
                                             </ul>
                                         </div>
 
+                                        <div className="mb-6 text-center">
+                                            <p className="text-[11px] text-gray-400 font-medium uppercase tracking-widest mb-1">Total Amount</p>
+                                            <h3 className="text-3xl font-bold text-charcoal">₹{finalTotal.toLocaleString()}</h3>
+                                        </div>
+
                                         {/* MAIN ACTION BUTTON */}
                                         <div className="space-y-4">
                                             <button
                                                 type="button"
-                                                onClick={handleRazorpayPayment} // Triggers the professional modal
+                                                onClick={handleRazorpayPayment}
                                                 disabled={processing}
                                                 className="w-full bg-[#5f259f] hover:bg-[#4d1e82] text-white py-5 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-3 shadow-xl shadow-purple-200 active:scale-[0.98] disabled:opacity-50"
                                             >
-                                                {processing ? (
-                                                    <Loader2 className="animate-spin" />
-                                                ) : (
-                                                    <>
-                                                        <Smartphone size={22} />
-                                                        <span>Pay ₹{finalTotal.toLocaleString()} Now</span>
-                                                    </>
-                                                )}
+                                                {processing ? <Loader2 className="animate-spin" /> : <><ShieldCheck size={22} /><span>Pay with Razorpay</span></>}
                                             </button>
 
                                             {/* Secondary Option: COD */}
                                             <button
                                                 type="button"
                                                 onClick={handleCODOrder}
-                                                className="w-full text-slate-400 text-xs font-bold py-2 hover:text-charcoal transition-colors uppercase tracking-[0.2em]"
+                                                disabled={processing}
+                                                className="w-full mt-6 flex items-center justify-center gap-2 py-4 px-6 
+                                              bg-[#FFD700] hover:bg-[#F0C500] text-charcoal 
+                                                font-bold text-xs uppercase tracking-[0.15em] rounded-xl
+                                                transition-all duration-300 shadow-md hover:shadow-lg
+                                                active:scale-[0.98] disabled:opacity-50 border border-yellow-400"
                                             >
-                                                Or Choose Cash on Delivery
+                                                <Truck size={16} />
+                                                <span>Cash on Delivery</span>
                                             </button>
                                         </div>
                                     </div>
@@ -833,6 +860,11 @@ const Checkout = () => {
                                             </ul>
                                         </div>
 
+                                        <div className="mb-6 text-center">
+                                            <p className="text-[11px] text-gray-400 font-medium uppercase tracking-widest mb-1">Total Amount</p>
+                                            <h3 className="text-3xl font-bold text-charcoal">${finalTotal.toFixed(2)}</h3>
+                                        </div>
+
                                         <PayPalScriptProvider options={paypalOptions}>
                                             <PayPalButtons
                                                 style={{ layout: 'vertical', color: 'blue', label: 'paypal', shape: 'rect', tagline: false }}
@@ -858,13 +890,13 @@ const Checkout = () => {
                                             />
                                         </PayPalScriptProvider>
 
-                                        <button
+                                        {/* <button
                                             type="button"
                                             onClick={handleCODOrder}
                                             className="w-full mt-4 text-slate-400 text-xs font-bold py-2 hover:text-charcoal transition-colors uppercase tracking-[0.2em]"
                                         >
                                             Or Choose Cash on Delivery
-                                        </button>
+                                        </button> */}
                                     </div>
 
                                     <div className="flex justify-center items-center gap-8 py-4 opacity-50 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-700">

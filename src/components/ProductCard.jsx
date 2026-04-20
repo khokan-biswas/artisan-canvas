@@ -7,7 +7,7 @@ const ProductCard = memo(({ painting }) => {
 
   // --- 0. SAFETY CHECK ---
   if (!painting) {
-//     console.warn("ProductCard: Missing painting data");
+    //     console.warn("ProductCard: Missing painting data");
     return null;
   }
 
@@ -96,17 +96,17 @@ const ProductCard = memo(({ painting }) => {
             {/* 1. USD PRICE (Primary) */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-xl font-bold text-charcoal font-serif">
+                <span className="text-sm font-semibold text-charcoal font-serif">
                   ${finalUSD.toLocaleString()}
                 </span>
                 {discountUSD > 0 && sellingUSD > finalUSD && (
-                  <span className="text-xs text-gray-400 line-through decoration-gray-300">
+                  <span className="text-[10px] text-gray-400 line-through">
                     ${sellingUSD.toLocaleString()}
                   </span>
                 )}
               </div>
               {discountUSD > 0 && (
-                <span className="text-[10px] font-bold text-green-700 bg-green-50 px-2 py-1 rounded-sm border border-green-100">
+                <span className="text-[10px] font-medium text-green-600">
                   {discountUSD}% OFF
                 </span>
               )}
@@ -119,7 +119,7 @@ const ProductCard = memo(({ painting }) => {
                   ₹{finalINR.toLocaleString()}
                 </span>
                 {discountINR > 0 && sellingINR > finalINR && (
-                  <span className="text-[10px] text-gray-300 line-through">
+                  <span className="text-[10px] text-gray-400 line-through">
                     ₹{sellingINR.toLocaleString()}
                   </span>
                 )}

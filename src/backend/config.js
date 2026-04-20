@@ -22,23 +22,23 @@ export class Service {
   // ==========================================
 
   // ✅ NEW: Check if current user is Admin via Appwrite Function
-  async isUserAdmin() {
-    try {
-      const execution = await this.functions.createExecution(
-        conf.appwriteCheckAdminFunctionId, // Make sure this is in your conf.js!
-        "", // No payload needed for GET
-        false, // Async = false (wait for response)
-        "/",
-        "GET",
-      );
+  // async isUserAdmin() {
+  //   try {
+  //     const execution = await this.functions.createExecution(
+  //       conf.appwriteCheckAdminFunctionId, // Make sure this is in your conf.js!
+  //       "", // No payload needed for GET
+  //       false, // Async = false (wait for response)
+  //       "/",
+  //       "GET",
+  //     );
 
-      const response = JSON.parse(execution.responseBody);
-      return response.isAdmin; // Returns true or false
-    } catch (error) {
-      //       console.error("Appwrite service :: isUserAdmin :: error", error);
-      return false; // Default to false on error for security
-    }
-  }
+  //     const response = JSON.parse(execution.responseBody);
+  //     return response.isAdmin; // Returns true or false
+  //   } catch (error) {
+  //     //       console.error("Appwrite service :: isUserAdmin :: error", error);
+  //     return false; // Default to false on error for security
+  //   }
+  // }
 
   // ==========================================
   // 🎨 PAINTINGS (PRODUCTS)
@@ -203,7 +203,7 @@ export class Service {
 
   // 3. Frontend Order Logic (Direct DB Operations)
   // ✅ UPDATED: Matching the 'shippingAddress' key from your Checkout component
-  async createCODOrder({
+ async createCODOrder({
     userId,
     items,
     customerName,
@@ -212,61 +212,71 @@ export class Service {
     totalAmount,
     paymentMethod = "COD",
     paymentId = null,
-  }) {
+
+}) {
+    // --- DEBUG LOG: Input Data ---
+    console.log("DEBUG: createCODOrder received:", { userId, items, totalAmount, paymentMethod });
+
     try {
-      const paintingIds = Array.isArray(items) ? items : [items];
+        const paintingIds = Array.isArray(items) ? items : [items];
 
-      // A. Verify Stock First
-      for (const id of paintingIds) {
-        const p = await this.databases.getDocument(
-          conf.appwriteDatabaseId,
-          conf.appwritePaintingsCollectionId,
-          id,
+        // A. Verify Stock First
+        for (const id of paintingIds) {
+            const p = await this.databases.getDocument(
+                conf.appwriteDatabaseId,
+                conf.appwritePaintingsCollectionId,
+                id,
+            );
+            if (p.isSold) throw new Error(`Item ${p.title} is already sold.`);
+        }
+
+        // B. Mark as Sold
+        for (const id of paintingIds) {
+            await this.databases.updateDocument(
+                conf.appwriteDatabaseId,
+                conf.appwritePaintingsCollectionId,
+                id,
+                { isSold: true },
+            );
+        }
+
+        const normalizedPaymentId = paymentId || `${paymentMethod}-${Date.now()}`;
+        const status = paymentMethod === "COD" ? "COD" : "Waiting for Payment";
+
+        // --- DEBUG LOG: Final Payload before DB call ---
+        const orderData = {
+            userId,
+            paintingId: paintingIds.join(","),
+            amount: parseFloat(totalAmount) || 0,
+            paymentId: normalizedPaymentId,
+            status,
+            customerName,
+            email,
+            shippingAddress: shippingAddress,
+            ordercomplete: "no",
+            currency: "INR",
+        };
+        
+        console.log("DEBUG: Database ID:", conf.appwriteDatabaseId);
+        console.log("DEBUG: Collection ID:", conf.appwriteOrdersCollectionId);
+        console.log("DEBUG: Final Payload Object:", orderData);
+
+        // C. Create Order Document
+        return await this.databases.createDocument(
+            conf.appwriteDatabaseId,
+            conf.appwriteOrdersCollectionId,
+            "unique()", // Using the string "unique()" instead of ID.unique() to avoid import errors
+            orderData
         );
-        if (p.isSold) throw new Error(`Item ${p.title} is already sold.`);
-      }
-
-      // B. Mark as Sold
-      for (const id of paintingIds) {
-        await this.databases.updateDocument(
-          conf.appwriteDatabaseId,
-          conf.appwritePaintingsCollectionId,
-          id,
-          { isSold: true },
-        );
-      }
-
-      const normalizedPaymentId = paymentId || `${paymentMethod}-${Date.now()}`;
-      const status = paymentMethod === "COD"
-        ? "COD"
-        : paymentMethod === "UPI_QR"
-          ? "Waiting for Payment"
-          : paymentMethod;
-
-      // C. Create Order Document
-      return await this.databases.createDocument(
-        conf.appwriteDatabaseId,
-        conf.appwriteOrdersCollectionId,
-        ID.unique(),
-        {
-          userId,
-          paintingId: paintingIds.join(","),
-          amount: parseFloat(totalAmount) || 0,
-          paymentId: normalizedPaymentId,
-          method: paymentMethod,
-          status,
-          customerName,
-          email,
-          shippingAddress: shippingAddress,
-          ordercomplete: paymentMethod === "COD" ? "no" : "pending",
-          currency: "INR",
-        },
-      );
     } catch (error) {
-      //       console.error("Appwrite service :: createCODOrder :: error", error);
-      throw error;
+        console.error("DEBUG ERROR: Appwrite Order Creation Failed", error);
+        // Important: check if error is specifically about a missing attribute
+        if (error.message.includes("Attribute")) {
+            console.warn("Check your Appwrite Console: One of the fields in 'orderData' might be missing from your collection attributes.");
+        }
+        throw error;
     }
-  }
+}
 
   // 4. Fetch Orders
   async getOrders(queries = []) {

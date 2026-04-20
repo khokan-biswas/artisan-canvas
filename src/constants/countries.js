@@ -13,23 +13,23 @@ export const COUNTRIES = [
 // Shipping costs by country
 export const SHIPPING_RATES_USD = {
   "India": 0,
-  "USA": 50,
-  "Canada": 80,
-  "UK": 100,
-  "Germany": 110,
-  "Australia": 150,
-  "France": 120,
-  "Other": 180
+  "USA": 0,
+  "Canada": 0,
+  "UK": 0,
+  "Germany": 0,
+  "Australia": 0,
+  "France": 0,
+  "Other": 0
 };
 
 // Shipping costs by country
 export const SHIPPING_RATES_INR = {
   "India": 0,
-  "USA": 99,
-  "Canada": 99,
-  "UK": 99,
-  "Germany": 99,
-  "Australia": 99,
-  "France": 99,
-  "Other": 99,
+  "USA": 0,
+  "Canada": 0,
+  "UK": 0,
+  "Germany": 0,
+  "Australia": 0,
+  "France": 0,
+  "Other": 0,
 };

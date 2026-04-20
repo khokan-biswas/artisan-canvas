@@ -49,7 +49,7 @@ const Header = () => {
             navigate('/login');
             setIsMobileMenuOpen(false);
         } catch (error) {
-//             console.error("Logout failed", error);
+            //             console.error("Logout failed", error);
         }
     };
 
@@ -60,10 +60,9 @@ const Header = () => {
     ];
 
     return (<>
-        <header className={`sticky top-0 z-50 w-full bg-[#FDFBF7]/95 backdrop-blur-sm border-b border-gray-200 shadow-sm transition-all duration-300 transform ${hideHeader ? '-translate-y-full' : 'translate-y-0'}`}>
+        <header className="fixed top-0 left-0 z-50 w-full bg-[#FDFBF7]/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
             <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-20">
-                    
                     {/* --- LEFT: Logo --- */}
                     <div className="flex-shrink-0 cursor-pointer" onClick={() => navigate('/')}>
                         <h1 className="text-2xl font-serif font-bold text-slate-800 tracking-wide">
@@ -82,7 +81,7 @@ const Header = () => {
 
                     {/* --- RIGHT: Actions & Profile Section --- */}
                     <div className="hidden md:flex items-center space-x-6">
-                        
+
                         {/* Cart */}
                         <Link to="/checkout" className="relative group p-2">
                             <ShoppingCart className="h-6 w-6 text-gray-600 group-hover:text-black transition" />
@@ -95,7 +94,7 @@ const Header = () => {
 
                         {authStatus ? (
                             <div className="flex items-center gap-6 pl-4 border-l border-gray-200">
-                                
+
                                 {isAdmin && (
                                     <Link to="/admin/dashboard" className="flex items-center gap-1.5 text-sm font-bold text-blue-600 hover:text-blue-800 transition" title="Admin Dashboard">
                                         <LayoutDashboard size={18} />
@@ -114,8 +113,8 @@ const Header = () => {
                                 </button>
 
                                 {/* --- 👤 PROFILE LOGO (FAR RIGHT) --- */}
-                                <Link 
-                                    to="/user-details" 
+                                <Link
+                                    to="/user-details"
                                     className="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-sm border-2 border-transparent hover:border-slate-800 hover:bg-white hover:text-slate-800 transition-all duration-300 uppercase shadow-sm"
                                     title="Profile Settings"
                                 >
@@ -132,12 +131,12 @@ const Header = () => {
                     {/* --- MOBILE: Menu Button --- */}
                     <div className="md:hidden flex items-center gap-4">
                         <Link to="/checkout" className="relative p-2">
-                             <ShoppingCart size={24} className="text-gray-700" />
-                             {cartItems.length > 0 && (
+                            <ShoppingCart size={24} className="text-gray-700" />
+                            {cartItems.length > 0 && (
                                 <span className="absolute top-0 right-0 bg-black text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
                                     {cartItems.length}
                                 </span>
-                             )}
+                            )}
                         </Link>
                         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-1">
                             {isMobileMenuOpen ? <X size={30} /> : <Menu size={30} />}
@@ -149,10 +148,10 @@ const Header = () => {
             {/* --- MOBILE MENU DRAWER --- */}
             {isMobileMenuOpen && (
                 <div className="md:hidden bg-[#FDFBF7] border-t border-gray-200 absolute w-full left-0 shadow-xl p-6 space-y-4">
-                    
+
                     {authStatus && (
                         <Link to="/user-details" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-4 pb-4 border-b border-gray-100">
-                             <div className="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-lg uppercase">
+                            <div className="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-lg uppercase">
                                 {userInitial}
                             </div>
                             <div className="flex flex-col">
@@ -167,19 +166,19 @@ const Header = () => {
                             {item.name}
                         </Link>
                     ))}
-                    
+
                     <div className="pt-4 border-t border-gray-100 flex flex-col gap-4">
                         <Link to="/orders" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 text-gray-700 font-medium">
-                            <Package size={20}/> My Orders
+                            <Package size={20} /> My Orders
                         </Link>
                         {isAdmin && (
                             <Link to="/admin/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 text-blue-600 font-bold">
-                                <LayoutDashboard size={20}/> Admin Dashboard
+                                <LayoutDashboard size={20} /> Admin Dashboard
                             </Link>
                         )}
                         {authStatus ? (
                             <button onClick={logoutHandler} className="flex items-center gap-3 text-red-600 font-bold py-2">
-                                <LogOut size={20}/> Logout Account
+                                <LogOut size={20} /> Logout Account
                             </button>
                         ) : (
                             <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="w-full bg-black text-white text-center py-3 rounded-sm font-bold uppercase tracking-widest text-xs">
@@ -217,37 +216,37 @@ const Header = () => {
 
         {/* Mobile Bottom Navbar */}
         {showMobileNav && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-xl">
-            <nav className="flex items-center justify-between px-4 py-3">
-                <button type="button" onClick={() => { navigate('/'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
-                    <Home size={20} />
-                    <span>Home</span>
-                </button>
-                <button type="button" onClick={() => { navigate('/shop'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
-                    <ShoppingCart size={20} />
-                    <span>Shop</span>
-                </button>
-                <button type="button" onClick={() => { navigate('/about'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
-                    <Info size={20} />
-                    <span>About</span>
-                </button>
-                <button type="button" onClick={() => { navigate(authStatus ? '/user-details' : '/login'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
-                    <User size={20} />
-                    <span>Profile</span>
-                </button>
-                {authStatus ? (
-                    <button type="button" onClick={logoutHandler} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-red-500 hover:text-red-700 transition">
-                        <LogOut size={20} />
-                        <span>Logout</span>
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-xl">
+                <nav className="flex items-center justify-between px-4 py-3">
+                    <button type="button" onClick={() => { navigate('/'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
+                        <Home size={20} />
+                        <span>Home</span>
                     </button>
-                ) : (
-                    <button type="button" onClick={() => { navigate('/login'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
-                        <LogOut size={20} />
-                        <span>Login</span>
+                    <button type="button" onClick={() => { navigate('/shop'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
+                        <ShoppingCart size={20} />
+                        <span>Shop</span>
                     </button>
-                )}
-            </nav>
-        </div>
+                    <button type="button" onClick={() => { navigate('/about'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
+                        <Info size={20} />
+                        <span>About</span>
+                    </button>
+                    <button type="button" onClick={() => { navigate(authStatus ? '/user-details' : '/login'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
+                        <User size={20} />
+                        <span>Profile</span>
+                    </button>
+                    {authStatus ? (
+                        <button type="button" onClick={logoutHandler} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-red-500 hover:text-red-700 transition">
+                            <LogOut size={20} />
+                            <span>Logout</span>
+                        </button>
+                    ) : (
+                        <button type="button" onClick={() => { navigate('/login'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center space-y-1 text-[10px] text-gray-600 hover:text-black transition">
+                            <LogOut size={20} />
+                            <span>Login</span>
+                        </button>
+                    )}
+                </nav>
+            </div>
         )}
     </>);
 };
